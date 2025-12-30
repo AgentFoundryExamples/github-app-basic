@@ -31,6 +31,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from app.utils.logging import get_logger
+from app.utils.security import redact_token, sanitize_exception_message, redact_dict
 
 logger = get_logger(__name__)
 
@@ -107,9 +108,9 @@ class GitHubAppJWT:
         except Exception as e:
             logger.error(
                 "Failed to load GitHub App private key",
-                extra={"extra_fields": {"error": str(e)}}
+                extra={"extra_fields": {"error": sanitize_exception_message(e)}}
             )
-            raise GitHubAppJWTError(f"Invalid private key: {str(e)}")
+            raise GitHubAppJWTError(f"Invalid private key: {sanitize_exception_message(e)}")
     
     def generate_jwt(self, expiration_seconds: int = 600) -> str:
         """Generate a signed JWT for GitHub App authentication.
@@ -162,9 +163,9 @@ class GitHubAppJWT:
         except Exception as e:
             logger.error(
                 "Failed to generate GitHub App JWT",
-                extra={"extra_fields": {"error": str(e)}}
+                extra={"extra_fields": {"error": sanitize_exception_message(e)}}
             )
-            raise GitHubAppJWTError(f"JWT generation failed: {str(e)}")
+            raise GitHubAppJWTError(f"JWT generation failed: {sanitize_exception_message(e)}")
 
 
 class GitHubOAuthManager:
@@ -309,7 +310,7 @@ class GitHubOAuthManager:
                         "GitHub OAuth token exchange failed",
                         extra={"extra_fields": {
                             "status_code": response.status_code,
-                            "response_body": response.text[:500]  # Truncate for security
+                            "response_preview": "[REDACTED]"  # Never log response body
                         }}
                     )
                     raise GitHubOAuthError(
@@ -342,12 +343,7 @@ class GitHubOAuthManager:
                 
                 # Log success with masked token
                 token = data["access_token"]
-                # Show prefix (first 8) and last 4 characters for better context
-                if len(token) >= 16:
-                    masked_token = token[:8] + "..." + token[-4:]
-                else:
-                    # For shorter tokens, mask more conservatively
-                    masked_token = token[:4] + "..."
+                masked_token = redact_token(token)
                 
                 logger.info(
                     "OAuth token exchange successful",
@@ -364,17 +360,17 @@ class GitHubOAuthManager:
         except httpx.HTTPError as e:
             logger.error(
                 "HTTP error during token exchange",
-                extra={"extra_fields": {"error": str(e)}}
+                extra={"extra_fields": {"error": sanitize_exception_message(e)}}
             )
-            raise GitHubOAuthError(f"HTTP error: {str(e)}")
+            raise GitHubOAuthError(f"HTTP error: {sanitize_exception_message(e)}")
         except Exception as e:
             if isinstance(e, GitHubOAuthError):
                 raise
             logger.error(
                 "Unexpected error during token exchange",
-                extra={"extra_fields": {"error": str(e)}}
+                extra={"extra_fields": {"error": sanitize_exception_message(e)}}
             )
-            raise GitHubOAuthError(f"Unexpected error: {str(e)}")
+            raise GitHubOAuthError(f"Unexpected error: {sanitize_exception_message(e)}")
 
 
 class GitHubTokenRefreshManager:

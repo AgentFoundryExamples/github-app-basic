@@ -113,6 +113,9 @@ def get_logger(name: str) -> logging.Logger:
 def mask_sensitive_data(value: str, visible_chars: int = 4) -> str:
     """Mask sensitive data for safe logging.
     
+    DEPRECATED: Use app.utils.security.redact_token() instead.
+    This function is kept for backward compatibility.
+    
     Shows only the first N characters and masks the rest with asterisks.
     
     Args:
@@ -130,11 +133,6 @@ def mask_sensitive_data(value: str, visible_chars: int = 4) -> str:
         >>> mask_sensitive_data("", 4)
         "****"
     """
-    if not value:
-        return "****"
-    
-    if len(value) <= visible_chars:
-        return value
-    
-    masked_length = len(value) - visible_chars
-    return f"{value[:visible_chars]}{'*' * masked_length}"
+    # Import here to avoid circular dependency
+    from app.utils.security import redact_token
+    return redact_token(value, prefix_len=visible_chars, suffix_len=0, mask_char="*")
