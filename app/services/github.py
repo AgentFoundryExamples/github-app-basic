@@ -19,16 +19,16 @@ Provides functionality for:
 - Managing OAuth state tokens for CSRF protection
 """
 
-import time
-import secrets
 import asyncio
-from typing import Dict, Optional, Any
+import secrets
+import time
 from datetime import datetime, timedelta, timezone
+from typing import Dict, Optional, Any
 
-import jwt
 import httpx
-from cryptography.hazmat.primitives import serialization
+import jwt
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 
 from app.utils.logging import get_logger
 
@@ -441,8 +441,18 @@ class GitHubTokenRefreshManager:
             last_status = current_token_data.get("last_refresh_status")
             
             if last_attempt_str and last_status == "failed":
-                from app.dao.firestore_dao import FirestoreDAO
-                last_attempt = FirestoreDAO.parse_iso_datetime(last_attempt_str)
+                # Parse ISO datetime string to timezone-aware datetime
+                last_attempt = None
+                if last_attempt_str:
+                    try:
+                        last_attempt = datetime.fromisoformat(last_attempt_str)
+                        # Ensure timezone-aware - if naive, assume UTC
+                        if last_attempt.tzinfo is None:
+                            last_attempt = last_attempt.replace(tzinfo=timezone.utc)
+                    except (ValueError, TypeError):
+                        logger.warning(
+                            f"Failed to parse last_refresh_attempt datetime: {last_attempt_str}"
+                        )
                 
                 if last_attempt:
                     time_since_last_attempt = (now - last_attempt).total_seconds()
