@@ -47,36 +47,66 @@ The service is configured via environment variables. Create a `.env` file in the
 
 ### GitHub App Setup
 
-Before configuring the service, you need to create and configure a GitHub App:
+Before configuring the service, you need to create and configure a GitHub App. Follow these steps carefully to ensure proper OAuth integration.
 
 1. **Create a GitHub App**:
    - Go to [GitHub Settings → Developer settings → GitHub Apps](https://github.com/settings/apps)
    - Click "New GitHub App"
    - Fill in the required information:
-     - **GitHub App name**: Choose a unique name
+     - **GitHub App name**: Choose a unique name (e.g., "My Token Minting Service")
      - **Homepage URL**: Your application URL or repository URL
      - **Webhook URL**: `https://your-service.run.app/webhooks/github` (or your local testing URL)
+       - *Note: Webhook functionality is not yet implemented but required by GitHub*
      - **Webhook secret**: Generate a secure random token (e.g., `openssl rand -hex 32`)
 
 2. **Configure Permissions** (as needed for your use case):
    - Set repository or organization permissions based on your requirements
-   - Subscribe to relevant webhook events
+   - Common permissions for token minting:
+     - **Repository permissions:** Contents (read), Metadata (read)
+     - **Organization permissions:** Members (read)
+   - Subscribe to relevant webhook events (for future webhook handling)
 
 3. **Generate OAuth Credentials**:
-   - In your GitHub App settings, note the **App ID** (numeric)
-   - Generate a **Client Secret** under "Client secrets"
-   - Note the **Client ID** (starts with `Iv1.` or `Iv23.`)
+   - In your GitHub App settings, note the **App ID** (numeric, e.g., `123456`)
+   - Under "Client secrets" section:
+     - Click "Generate a new client secret"
+     - **Copy the secret immediately** - GitHub shows it only once
+     - This is your `GITHUB_CLIENT_SECRET`
+   - Note the **Client ID** at the top (starts with `Iv1.` or `Iv23.`)
+     - This is your `GITHUB_CLIENT_ID`
 
 4. **Generate a Private Key**:
    - Scroll to "Private keys" section
    - Click "Generate a private key"
    - Download the `.pem` file - this is your `GITHUB_APP_PRIVATE_KEY_PEM`
    - **IMPORTANT**: Store this file securely. GitHub will not show it again.
+   - For production, consider using Google Secret Manager or similar
 
 5. **Configure OAuth Callback URL**:
-   - Set the callback URL to match your redirect URI:
-     - Local: `http://localhost:8000/auth/callback`
-     - Cloud Run: `https://your-service-name.run.app/auth/callback`
+   - ⚠️ **CRITICAL:** The callback URL must exactly match your service's redirect URI
+   - In GitHub App settings, under "Identifying and authorizing users":
+     - **Callback URL** (required for OAuth):
+       - Local development: `http://localhost:8000/oauth/callback`
+       - Cloud Run: `https://your-service-name-xxxxx-uc.a.run.app/oauth/callback`
+     - **Request user authorization (OAuth) during installation:** ✅ Enable this
+     - **Enable Device Flow:** Optional (not used by this service)
+   
+   ⚠️ **Common Mistakes to Avoid:**
+   - Using `/auth/callback` instead of `/oauth/callback` (incorrect path)
+   - Missing or incorrect protocol (HTTP vs HTTPS)
+   - Including trailing slashes (e.g., `/oauth/callback/`)
+   - Using `localhost` vs `127.0.0.1` (GitHub treats these as different)
+   - Wrong port number
+
+6. **Save the GitHub App**:
+   - Click "Create GitHub App" at the bottom
+   - You'll be redirected to your app's settings page
+   - Keep this page open for copying credentials
+
+**After Creating the App:**
+- Copy all credentials immediately (especially the client secret, shown only once)
+- Store credentials securely (never commit to git)
+- Test the OAuth flow using the [OAuth Flow Manual Verification](#oauth-flow-manual-browser-verification) guide
 
 ### Required for Production (APP_ENV=prod)
 
@@ -243,72 +273,421 @@ GET /healthz
 ```
 Returns: `{"status": "ok"}`
 
-### GitHub App Installation
+Used by load balancers and monitoring tools to verify service health.
+
+### GitHub App Installation (OAuth Initiation)
 ```
 GET /github/install
 ```
-Redirects to GitHub's OAuth authorization page to install the GitHub App.
+Initiates the OAuth flow by redirecting to GitHub's authorization page.
+
+**⚠️ Interactive Use Only:** This endpoint must be opened in a web browser, not called via API clients.
 
 **Query Parameters:**
 - `scopes` (optional): Comma-separated list of OAuth scopes. Default: `user:email,read:org`
+  - Common scopes: `repo`, `user`, `read:org`, `write:org`, `admin:repo_hook`
 
 **Response:**
-- HTTP 302 redirect to GitHub authorization page
-- Sets `oauth_state` cookie for CSRF protection
+- **302 Redirect** to GitHub authorization page at `https://github.com/login/oauth/authorize`
+- **Sets Cookie:** `oauth_state` (HttpOnly, secure in production, 5-minute expiration)
 
 **Example:**
 ```bash
-curl http://localhost:8000/github/install
-# Redirects to: https://github.com/login/oauth/authorize?client_id=...&state=...
+# Open in browser (do not use curl for OAuth flow)
+http://localhost:8000/github/install
+
+# With custom scopes
+http://localhost:8000/github/install?scopes=repo,user,read:org
 ```
 
-### OAuth Callback
+**Security:**
+- CSRF protection via cryptographically strong state token
+- State token stored server-side and in cookie (dual verification)
+- 5-minute expiration window
+
+**See:** [OAuth Flow: Manual Browser Verification](#oauth-flow-manual-browser-verification) for detailed step-by-step instructions.
+
+### OAuth Callback Handler
 ```
 GET /oauth/callback
 ```
-Handles the OAuth callback from GitHub after user authorization.
+Handles the OAuth callback from GitHub after user authorization. **Do not call directly.**
 
-**Query Parameters:**
-- `code`: Authorization code from GitHub (required)
-- `state`: CSRF state token (required)
-- `error`: Error code if authorization failed (optional)
-- `error_description`: Error description (optional)
+**⚠️ GitHub Redirect Only:** This endpoint is automatically invoked by GitHub's OAuth redirect. 
+Browser clients should never call this endpoint directly.
+
+**Query Parameters (provided by GitHub):**
+- `code` (required): Authorization code from GitHub (single-use, 10-minute expiration)
+- `state` (required): CSRF state token (must match server-side token and cookie)
+- `error` (optional): Error code if authorization failed (e.g., `access_denied`)
+- `error_description` (optional): Human-readable error description
 
 **Response:**
-- HTTP 200: HTML success page with token details (masked)
-- HTTP 400: HTML error page for invalid state or missing parameters
-- HTTP 500: HTML error page for token exchange failures
+- **200 OK:** HTML success page with token information (token type, scopes, expiration)
+- **400 Bad Request:** HTML error page for:
+  - Missing parameters (code or state)
+  - State token mismatch (CSRF protection failure)
+  - Expired or already-used state token
+  - User denied authorization
+- **500 Internal Server Error:** HTML error page for:
+  - Token exchange failure with GitHub API
+  - Invalid authorization code
+  - Network errors
 
 **Security Features:**
-- Validates CSRF state token (one-time use)
-- Checks state cookie matches query parameter
-- State tokens expire after 5 minutes
-- Logs all OAuth attempts with correlation IDs
-- Masks tokens in logs (shows only first 8 and last 4 characters)
+- Dual state verification (cookie and server-side store)
+- One-time use state tokens (consumed on verification)
+- 5-minute state token expiration
+- Token masking in logs (shows only first 8 and last 4 characters)
+- Correlation IDs for request tracing
+
+**Token Handling:**
+- ✅ Tokens are logged (masked) with correlation IDs for debugging
+- ❌ Tokens are **NOT persisted** to any database or storage
+- ⚠️ This is intentional for single-user interactive demo scenarios
+- ⚠️ Production multi-user apps should implement secure token storage
 
 **Example Success Flow:**
-1. User visits `/github/install`
-2. User authorizes on GitHub
-3. GitHub redirects to `/oauth/callback?code=...&state=...`
+1. User navigates to `/github/install` in browser
+2. User authorizes the app on GitHub's website
+3. GitHub redirects to `/oauth/callback?code=abc123...&state=xyz789...`
 4. Service validates state and exchanges code for access token
-5. User sees success page with token details
+5. User sees HTML success page: "Authorization Successful"
+6. Logs show masked token: `ghp_abc12...xyz9`
 
-**Notes:**
-- Access tokens are logged but NOT persisted to any database
-- Tokens are masked in logs for security
-- All OAuth flows include correlation IDs for tracking
+**Example Error Flow (State Mismatch):**
+1. User opens `/github/install` with cookies disabled
+2. Authorizes on GitHub
+3. Callback receives `state` but no cookie
+4. Service returns 400 error page: "State token mismatch"
+5. User must enable cookies and retry from beginning
+
+**See:** [Troubleshooting OAuth Issues](#troubleshooting-oauth-issues) for common error scenarios and solutions.
 
 ### OpenAPI Documentation
 ```
 GET /docs
 ```
-Interactive Swagger UI documentation
+Interactive Swagger UI documentation with detailed endpoint specifications.
+
+**Features:**
+- Try out endpoints directly (except OAuth which requires browser flow)
+- View request/response schemas
+- See example values and descriptions
+- Download OpenAPI JSON spec
+
+**Note:** In Cloud Run deployments with IAM authentication, access requires authentication via `gcloud proxy`.
 
 ### OpenAPI JSON Schema
 ```
 GET /openapi.json
 ```
 OpenAPI 3.0 specification in JSON format
+
+## OAuth Flow: Manual Browser Verification
+
+This section provides step-by-step instructions for testing the OAuth flow manually using a web browser. This is essential for verifying your GitHub App configuration and understanding the interactive authentication process.
+
+### Prerequisites
+
+Before testing the OAuth flow, ensure you have:
+
+1. **Created a GitHub App** (see [GitHub App Setup](#github-app-setup) section above)
+2. **Configured environment variables** with your GitHub App credentials
+3. **Set the correct OAuth callback URL** in your GitHub App settings
+4. **Started the FastAPI service** locally or deployed to Cloud Run
+
+### Step-by-Step OAuth Flow Verification
+
+#### 1. Configure Callback URL
+
+**Critical:** The callback URL in your GitHub App settings **must exactly match** the redirect URI in your configuration.
+
+**For Local Development:**
+```bash
+# In GitHub App settings, set:
+Callback URL: http://localhost:8000/oauth/callback
+
+# In your environment or .env file:
+export GITHUB_OAUTH_REDIRECT_URI="http://localhost:8000/oauth/callback"
+```
+
+**For Cloud Run Deployment:**
+```bash
+# In GitHub App settings, set:
+Callback URL: https://your-service-name-xxxxx-uc.a.run.app/oauth/callback
+
+# In Cloud Run environment variables:
+GITHUB_OAUTH_REDIRECT_URI=https://your-service-name-xxxxx-uc.a.run.app/oauth/callback
+```
+
+**⚠️ Common Pitfalls:**
+- **HTTP vs HTTPS:** Mismatched protocols will cause OAuth to fail
+- **Trailing slashes:** `http://localhost:8000/oauth/callback/` ≠ `http://localhost:8000/oauth/callback`
+- **Port numbers:** Must match exactly if specified
+- **Localhost vs 127.0.0.1:** GitHub treats these as different hosts
+
+#### 2. Start the Service
+
+**Local Development:**
+```bash
+# Ensure environment variables are set
+export GITHUB_CLIENT_ID=Iv1.your_client_id
+export GITHUB_CLIENT_SECRET=your_client_secret
+export GITHUB_APP_ID=your_app_id
+export GITHUB_OAUTH_REDIRECT_URI=http://localhost:8000/oauth/callback
+
+# Start the service
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**Cloud Run (with gcloud proxy):**
+```bash
+# Start authenticated proxy
+gcloud run services proxy github-app-token-service --region us-central1
+
+# The service will be available at http://localhost:8080
+```
+
+#### 3. Initiate OAuth Flow
+
+Open your web browser and navigate to the installation endpoint:
+
+```bash
+# Local
+http://localhost:8000/github/install
+
+# Or with custom scopes
+http://localhost:8000/github/install?scopes=repo,user,read:org
+
+# Cloud Run (via proxy)
+http://localhost:8080/github/install
+```
+
+**What Happens:**
+1. The service generates a CSRF state token
+2. Sets an `oauth_state` cookie in your browser (HttpOnly, 5-minute expiration)
+3. Redirects you to GitHub's authorization page: `https://github.com/login/oauth/authorize`
+
+#### 4. Authorize on GitHub
+
+You will see the GitHub authorization page with:
+- The name of your GitHub App
+- Requested OAuth scopes (permissions)
+- Options to grant access to specific repositories or all repositories
+- "Authorize [App Name]" button
+
+**Actions:**
+- Review the requested permissions
+- Select repository access (if applicable)
+- Click "Authorize [App Name]" to approve
+- Or click "Cancel" to deny authorization
+
+#### 5. Handle Callback
+
+After authorization, GitHub redirects your browser back to:
+```
+http://localhost:8000/oauth/callback?code=abc123...&state=xyz789...
+```
+
+**The service will:**
+1. Validate the state token matches the cookie (CSRF protection)
+2. Verify the state token hasn't expired (5-minute limit)
+3. Exchange the authorization code for an access token via GitHub API
+4. Display an HTML success or error page
+
+#### 6. Verify Success
+
+**Success Page Shows:**
+- ✓ Checkmark icon and "Authorization Successful" heading
+- Token type (typically "bearer")
+- Granted scopes (the permissions you approved)
+- Token expiration (usually "Token does not expire" for user tokens)
+
+**Check Logs:**
+```bash
+# Service logs will show (with masked tokens):
+{
+  "level": "INFO",
+  "message": "OAuth flow completed successfully",
+  "extra_fields": {
+    "correlation_id": "...",
+    "token_type": "bearer",
+    "scope": "repo,user:email,read:org",
+    "has_expiry": false
+  }
+}
+```
+
+**⚠️ Important Note:** Access tokens are logged (with masking) but **NOT stored persistently**. This is intentional for the single-user interactive demo scenario. For production use, implement secure token storage.
+
+### Troubleshooting OAuth Issues
+
+#### State Mismatch Error
+
+**Error Message:** "State token mismatch" or "State token does not match the expected value"
+
+**Causes:**
+- Cookies are disabled in your browser
+- Cookie domain/path mismatch
+- HTTP vs HTTPS configuration mismatch
+- Browser privacy settings blocking third-party cookies
+
+**Solutions:**
+1. Enable cookies in your browser
+2. Use the same protocol (HTTP/HTTPS) throughout
+3. Check browser console for cookie errors
+4. Try in an incognito/private window
+
+#### State Expired Error
+
+**Error Message:** "Invalid or expired state token" or "State token is invalid, expired, or has already been used"
+
+**Causes:**
+- More than 5 minutes elapsed between `/github/install` and callback
+- State token was already used (refreshed callback page)
+- Server restarted between install and callback (in-memory state lost)
+
+**Solutions:**
+1. Complete the OAuth flow within 5 minutes
+2. Don't refresh the callback page after success
+3. Restart from `/github/install` to generate a new state token
+4. For production with multiple instances, use Redis for state storage
+
+#### Invalid Code Error
+
+**Error Message:** "Failed to exchange authorization code for access token"
+
+**Causes:**
+- Authorization code already used (can only be exchanged once)
+- Authorization code expired (10-minute GitHub limit)
+- Incorrect `CLIENT_SECRET` in configuration
+- Network error communicating with GitHub API
+
+**Solutions:**
+1. Don't refresh the callback page (codes are single-use)
+2. Restart OAuth flow from beginning
+3. Verify `GITHUB_CLIENT_SECRET` is correct
+4. Check service logs for detailed GitHub API error response
+
+#### Redirect URI Mismatch
+
+**Error Message (from GitHub):** "The redirect_uri MUST match the registered callback URL"
+
+**Causes:**
+- Callback URL in GitHub App settings doesn't match `GITHUB_OAUTH_REDIRECT_URI`
+- Protocol mismatch (HTTP vs HTTPS)
+- Port number mismatch
+- Trailing slash difference
+
+**Solutions:**
+1. Copy exact URL from GitHub App settings → "Callback URL"
+2. Paste into `GITHUB_OAUTH_REDIRECT_URI` environment variable
+3. Ensure exact match including protocol, domain, port, and path
+4. Restart the service after updating configuration
+
+#### Missing Configuration Error
+
+**Error Message:** "GitHub OAuth is not properly configured"
+
+**Causes:**
+- `GITHUB_CLIENT_ID` not set or empty
+- `GITHUB_OAUTH_REDIRECT_URI` not set or empty
+- Environment variables not loaded
+
+**Solutions:**
+1. Verify environment variables are set: `echo $GITHUB_CLIENT_ID`
+2. Check `.env` file exists and is in the correct location
+3. Restart the service after setting variables
+4. In production, verify Cloud Run environment variables
+
+### Rotating OAuth Credentials
+
+You may need to regenerate OAuth credentials if they're compromised or as part of regular security maintenance.
+
+#### Regenerate Client Secret
+
+1. **In GitHub App Settings:**
+   - Go to Settings → Developer settings → GitHub Apps → [Your App]
+   - Scroll to "Client secrets"
+   - Click "Generate a new client secret"
+   - **Copy the new secret immediately** (shown only once)
+   - Optionally delete old secret after updating configuration
+
+2. **Update Configuration:**
+   ```bash
+   # Local: Update .env file
+   GITHUB_CLIENT_SECRET=your_new_client_secret
+   
+   # Cloud Run: Update environment variable
+   gcloud run services update github-app-token-service \
+     --region us-central1 \
+     --update-env-vars GITHUB_CLIENT_SECRET=your_new_client_secret \
+     --project your-gcp-project-id
+   ```
+
+3. **Restart Service:**
+   - Local: Restart uvicorn
+   - Cloud Run: New revision deployed automatically
+
+4. **Test OAuth Flow:** Verify authentication still works
+
+#### Regenerate Private Key
+
+1. **In GitHub App Settings:**
+   - Go to Settings → Developer settings → GitHub Apps → [Your App]
+   - Scroll to "Private keys"
+   - Click "Generate a private key"
+   - Download the `.pem` file
+   - **Store securely** - GitHub won't show it again
+
+2. **Update Configuration:**
+   ```bash
+   # Local: Update .env file with PEM contents
+   GITHUB_APP_PRIVATE_KEY_PEM="-----BEGIN RSA PRIVATE KEY-----
+   MIIEpAIBAAKCAQEA...
+   -----END RSA PRIVATE KEY-----"
+   
+   # Or use escaped newlines
+   GITHUB_APP_PRIVATE_KEY_PEM="-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----"
+   
+   # Cloud Run: Update environment variable (use Secret Manager for production)
+   gcloud run services update github-app-token-service \
+     --region us-central1 \
+     --update-env-vars GITHUB_APP_PRIVATE_KEY_PEM="$(cat path/to/private-key.pem)" \
+     --project your-gcp-project-id
+   ```
+
+3. **Restart Service and Test**
+
+4. **Delete Old Key:** In GitHub App settings, you can revoke the old private key once the new one is verified working
+
+#### Best Practices for Credential Rotation
+
+- **Schedule Regular Rotations:** Every 90 days minimum
+- **Use Secret Manager:** For Cloud Run, store secrets in Google Secret Manager instead of environment variables
+- **Test Before Deleting:** Verify new credentials work before revoking old ones
+- **Document Rotation:** Keep a log of when credentials were last rotated
+- **Monitor After Rotation:** Watch logs for authentication failures
+- **Rotate All Credentials:** If one is compromised, rotate all related credentials
+
+### OAuth API Limitations
+
+**⚠️ This OAuth implementation is designed for interactive, single-user scenarios only:**
+
+- **No Token Persistence:** Access tokens are not stored in any database
+- **No Multi-User Support:** No user session management or token refresh
+- **No Token Refresh:** User must re-authenticate when tokens expire
+- **In-Memory State:** CSRF state tokens stored in memory (lost on restart)
+- **Single Instance:** State tokens not shared across multiple service instances
+
+**For Production Multi-User Applications, Consider:**
+- Implementing database storage for OAuth tokens (encrypted at rest)
+- Using Redis/Memcache for distributed state token storage
+- Adding user session management with secure cookies
+- Implementing token refresh logic for long-lived sessions
+- Setting up proper CORS policies for frontend applications
+- Using OAuth state parameter for deep linking after authentication
 
 ## Testing
 

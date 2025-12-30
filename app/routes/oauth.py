@@ -22,7 +22,7 @@ import secrets
 from typing import Optional
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Request, Response, HTTPException
+from fastapi import APIRouter, Request, Response, HTTPException, Query
 from fastapi.responses import RedirectResponse, HTMLResponse
 
 from app.config import Settings
@@ -34,8 +34,70 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@router.get("/github/install")
-async def github_install(request: Request) -> RedirectResponse:
+@router.get(
+    "/github/install",
+    summary="Initiate GitHub App Installation",
+    description="""
+Initiates the GitHub App OAuth installation flow by redirecting to GitHub's authorization page.
+
+**⚠️ Interactive Use Only:** This endpoint is designed for interactive browser use only. 
+It initiates an OAuth flow that requires user interaction in a web browser. 
+Do not call this endpoint from automated scripts or API clients.
+
+**Process:**
+1. Generates a cryptographically strong CSRF state token
+2. Stores the state token server-side with 5-minute expiration
+3. Sets an `oauth_state` cookie in the browser for additional verification
+4. Redirects browser to GitHub's OAuth authorization page
+5. User authorizes the app on GitHub
+6. GitHub redirects back to `/oauth/callback` with authorization code
+
+**Security Features:**
+- CSRF protection via state token
+- Cookie-based state verification
+- State tokens expire after 5 minutes
+- State tokens are single-use only
+
+**Cookies Set:**
+- `oauth_state`: Secure, HttpOnly cookie for state verification (expires in 5 minutes)
+  - `secure=true` in production (HTTPS only)
+  - `samesite=lax` to prevent CSRF attacks
+    """,
+    responses={
+        302: {
+            "description": "Redirect to GitHub OAuth authorization page",
+            "headers": {
+                "Location": {
+                    "description": "GitHub OAuth authorization URL with client_id, state, and scopes",
+                    "schema": {"type": "string"}
+                },
+                "Set-Cookie": {
+                    "description": "oauth_state cookie for CSRF verification (HttpOnly, 5-minute expiration)",
+                    "schema": {"type": "string"}
+                }
+            }
+        },
+        500: {
+            "description": "Server configuration error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "GitHub OAuth is not properly configured"
+                    }
+                }
+            }
+        }
+    },
+    tags=["oauth"]
+)
+async def github_install(
+    request: Request,
+    scopes: str = Query(
+        default="user:email,read:org",
+        description="Comma-separated list of OAuth scopes to request. Common scopes: repo, user, read:org, write:org",
+        examples=["repo,user:email,read:org", "user,read:org", "repo,user"]
+    )
+) -> RedirectResponse:
     """Redirect to GitHub App installation page with CSRF protection.
     
     Generates a state token for CSRF protection and redirects to GitHub's
@@ -82,14 +144,14 @@ async def github_install(request: Request) -> RedirectResponse:
         state = GitHubOAuthManager.generate_state_token()
         
         # Get scopes from query parameter or use defaults
-        scopes = request.query_params.get("scopes", "user:email,read:org")
+        scopes_param = scopes
         
         # Build GitHub OAuth authorization URL
         params = {
             "client_id": settings.github_client_id,
             "redirect_uri": settings.github_oauth_redirect_uri,
             "state": state,
-            "scope": scopes
+            "scope": scopes_param
         }
         
         # Add app_id if available for app installation flow
@@ -103,7 +165,7 @@ async def github_install(request: Request) -> RedirectResponse:
             extra={"extra_fields": {
                 "correlation_id": correlation_id,
                 "state_prefix": state[:8] + "...",
-                "scopes": scopes,
+                "scopes": scopes_param,
                 "redirect_uri": settings.github_oauth_redirect_uri
             }}
         )
@@ -125,13 +187,117 @@ async def github_install(request: Request) -> RedirectResponse:
         correlation_id_var.reset(token)
 
 
-@router.get("/oauth/callback")
+@router.get(
+    "/oauth/callback",
+    summary="GitHub OAuth Callback Handler",
+    description="""
+Handles the OAuth callback from GitHub after user authorization.
+
+**⚠️ Do Not Call Directly:** This endpoint should only be accessed via GitHub's OAuth redirect.
+Browser clients should not call this endpoint manually; it's invoked automatically by GitHub
+after the user completes the authorization flow on GitHub's website.
+
+**Process:**
+1. Receives authorization code and state from GitHub redirect
+2. Validates CSRF state token (checks cookie and server-side store)
+3. Exchanges authorization code for GitHub access token
+4. Logs token details (with masking for security)
+5. Returns user-friendly HTML success or error page
+6. Clears the oauth_state cookie
+
+**Security Features:**
+- Validates state token matches the cookie value
+- Verifies state token hasn't expired (5-minute lifetime)
+- Ensures state token is used only once (consumed on verification)
+- Masks tokens in logs (shows only first 8 and last 4 characters)
+
+**⚠️ Token Handling:**
+Access tokens are logged for development/debugging but **NOT persisted** to any database.
+This implementation is designed for **single-user interactive scenarios** only.
+For multi-user production deployments, implement secure token storage.
+
+**Common Errors:**
+- `400 Bad Request`: Missing parameters, state mismatch, expired state
+- `500 Internal Server Error`: Token exchange failure, GitHub API error
+    """,
+    responses={
+        200: {
+            "description": "OAuth flow completed successfully",
+            "content": {
+                "text/html": {
+                    "example": """
+<!DOCTYPE html>
+<html>
+<head><title>OAuth Success</title></head>
+<body>
+    <h1>Authorization Successful</h1>
+    <p>Token Type: bearer</p>
+    <p>Granted Scopes: repo,user:email</p>
+    <p>Expiration: Token does not expire.</p>
+</body>
+</html>
+                    """
+                }
+            }
+        },
+        400: {
+            "description": "Bad request - missing parameters, invalid state, or authorization denied",
+            "content": {
+                "text/html": {
+                    "examples": {
+                        "missing_params": {
+                            "summary": "Missing required parameters",
+                            "value": "HTML error page: Missing required parameters (code or state)"
+                        },
+                        "state_mismatch": {
+                            "summary": "State token mismatch",
+                            "value": "HTML error page: State token does not match (CSRF protection)"
+                        },
+                        "expired_state": {
+                            "summary": "Expired state token",
+                            "value": "HTML error page: State token expired or already used"
+                        },
+                        "user_denied": {
+                            "summary": "User denied authorization",
+                            "value": "HTML error page: GitHub authorization failed (user denied)"
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Server error - token exchange failed or GitHub API error",
+            "content": {
+                "text/html": {
+                    "example": "HTML error page: Failed to exchange authorization code for access token"
+                }
+            }
+        }
+    },
+    tags=["oauth"]
+)
 async def oauth_callback(
     request: Request,
-    code: Optional[str] = None,
-    state: Optional[str] = None,
-    error: Optional[str] = None,
-    error_description: Optional[str] = None
+    code: Optional[str] = Query(
+        default=None,
+        description="Authorization code from GitHub (provided by GitHub redirect)",
+        examples=["abc123def456"]
+    ),
+    state: Optional[str] = Query(
+        default=None,
+        description="CSRF state token (must match the cookie value)",
+        examples=["Hk9u7yXZ4bQrPm8L..."]
+    ),
+    error: Optional[str] = Query(
+        default=None,
+        description="Error code if authorization failed (e.g., 'access_denied')",
+        examples=["access_denied"]
+    ),
+    error_description: Optional[str] = Query(
+        default=None,
+        description="Human-readable error description from GitHub",
+        examples=["The user denied the authorization request"]
+    )
 ) -> HTMLResponse:
     """Handle OAuth callback from GitHub.
     
