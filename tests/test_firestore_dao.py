@@ -26,8 +26,8 @@ class TestFirestoreDAO:
     
     @pytest.fixture
     def mock_client(self):
-        """Create a mock Firestore client."""
-        return Mock(spec=firestore.Client)
+        """Create a mock Firestore async client."""
+        return Mock(spec=firestore.AsyncClient)
     
     @pytest.fixture
     def dao(self, mock_client):
@@ -43,7 +43,7 @@ class TestFirestoreDAO:
         mock_doc.to_dict.return_value = {"name": "test", "value": 123}
         
         mock_doc_ref = Mock()
-        mock_doc_ref.get.return_value = mock_doc
+        mock_doc_ref.get = AsyncMock(return_value=mock_doc)
         
         mock_collection = Mock()
         mock_collection.document.return_value = mock_doc_ref
@@ -67,7 +67,7 @@ class TestFirestoreDAO:
         mock_doc.exists = False
         
         mock_doc_ref = Mock()
-        mock_doc_ref.get.return_value = mock_doc
+        mock_doc_ref.get = AsyncMock(return_value=mock_doc)
         
         mock_collection = Mock()
         mock_collection.document.return_value = mock_doc_ref
@@ -101,6 +101,7 @@ class TestFirestoreDAO:
         """Test successful document persistence."""
         # Setup mock
         mock_doc_ref = Mock()
+        mock_doc_ref.set = AsyncMock()
         mock_collection = Mock()
         mock_collection.document.return_value = mock_doc_ref
         mock_client.collection.return_value = mock_collection
@@ -121,6 +122,7 @@ class TestFirestoreDAO:
         """Test document persistence with merge option."""
         # Setup mock
         mock_doc_ref = Mock()
+        mock_doc_ref.set = AsyncMock()
         mock_collection = Mock()
         mock_collection.document.return_value = mock_doc_ref
         mock_client.collection.return_value = mock_collection
@@ -173,7 +175,7 @@ class TestFirestoreService:
         with pytest.raises(ValueError, match="GCP_PROJECT_ID is not configured"):
             get_firestore_client(settings)
     
-    @patch('app.services.firestore.firestore.Client')
+    @patch('app.services.firestore.firestore.AsyncClient')
     def test_get_firestore_client_success(self, mock_firestore_client):
         """Test successful Firestore client initialization."""
         # Setup
@@ -193,7 +195,7 @@ class TestFirestoreService:
         assert client == mock_client_instance
         mock_firestore_client.assert_called_once_with(project="test-project")
     
-    @patch('app.services.firestore.firestore.Client')
+    @patch('app.services.firestore.firestore.AsyncClient')
     def test_get_firestore_client_caches_instance(self, mock_firestore_client):
         """Test that Firestore client is cached after first initialization."""
         # Setup
@@ -214,7 +216,7 @@ class TestFirestoreService:
         assert client1 == client2
         mock_firestore_client.assert_called_once()
     
-    @patch('app.services.firestore.firestore.Client')
+    @patch('app.services.firestore.firestore.AsyncClient')
     def test_get_firestore_client_api_error(self, mock_firestore_client):
         """Test handling of Google API errors during initialization."""
         # Setup mock to raise GoogleAPICallError
@@ -242,7 +244,7 @@ class TestFirestoreDependencyInjection:
         """Reset Firestore client after each test."""
         reset_firestore_client()
     
-    @patch('app.services.firestore.firestore.Client')
+    @patch('app.services.firestore.firestore.AsyncClient')
     def test_firestore_dao_dependency_success(self, mock_firestore_client):
         """Test successful FirestoreDAO dependency injection."""
         # Setup
@@ -272,7 +274,7 @@ class TestFirestoreDependencyInjection:
         assert exc_info.value.status_code == 503
         assert "configuration error" in exc_info.value.detail.lower()
     
-    @patch('app.services.firestore.firestore.Client')
+    @patch('app.services.firestore.firestore.AsyncClient')
     @patch('app.dependencies.firestore.get_firestore_client')
     def test_firestore_dao_in_fastapi_app(self, mock_get_client, mock_firestore_client, monkeypatch):
         """Test Firestore DAO integration in FastAPI application."""
@@ -329,7 +331,7 @@ class TestFirestoreEmulatorCompatibility:
         reset_firestore_client()
     
     @pytest.mark.integration
-    @patch('app.services.firestore.firestore.Client')
+    @patch('app.services.firestore.firestore.AsyncClient')
     def test_dao_operations_with_emulator(self, mock_firestore_client):
         """Test that DAO operations work with Firestore emulator.
         

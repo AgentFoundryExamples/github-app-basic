@@ -14,20 +14,20 @@ from app.utils.logging import get_logger
 logger = get_logger(__name__)
 
 # Global client instance (initialized lazily)
-_firestore_client: Optional[firestore.Client] = None
+_firestore_client: Optional[firestore.AsyncClient] = None
 
 
-def get_firestore_client(settings: Settings) -> firestore.Client:
-    """Get or create a Firestore client instance.
+def get_firestore_client(settings: Settings) -> firestore.AsyncClient:
+    """Get or create a Firestore async client instance.
     
-    Lazily initializes the Firestore client using the provided settings.
+    Lazily initializes the Firestore async client using the provided settings.
     Subsequent calls return the same client instance.
     
     Args:
         settings: Application settings containing GCP configuration.
         
     Returns:
-        Initialized Firestore client instance.
+        Initialized Firestore async client instance.
         
     Raises:
         ValueError: If GCP_PROJECT_ID is not configured.
@@ -49,21 +49,21 @@ def get_firestore_client(settings: Settings) -> firestore.Client:
     
     try:
         logger.info(
-            "Initializing Firestore client",
+            "Initializing Firestore async client",
             extra={"extra_fields": {
                 "project_id": settings.gcp_project_id,
                 "region": settings.region
             }}
         )
         
-        # Initialize Firestore client with project ID
+        # Initialize Firestore async client with project ID
         # Credentials are automatically discovered from:
         # 1. GOOGLE_APPLICATION_CREDENTIALS environment variable
         # 2. Cloud Run default service account (in production)
         # 3. gcloud auth application-default login (local development)
-        _firestore_client = firestore.Client(project=settings.gcp_project_id)
+        _firestore_client = firestore.AsyncClient(project=settings.gcp_project_id)
         
-        logger.info("Firestore client initialized successfully")
+        logger.info("Firestore async client initialized successfully")
         return _firestore_client
         
     except gcp_exceptions.GoogleAPICallError as e:

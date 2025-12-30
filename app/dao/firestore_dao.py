@@ -21,11 +21,11 @@ class FirestoreDAO:
     with proper error handling and logging.
     """
     
-    def __init__(self, client: firestore.Client):
-        """Initialize FirestoreDAO with a Firestore client.
+    def __init__(self, client: firestore.AsyncClient):
+        """Initialize FirestoreDAO with a Firestore async client.
         
         Args:
-            client: Initialized Firestore client instance.
+            client: Initialized Firestore async client instance.
         """
         self.client = client
     
@@ -57,7 +57,7 @@ class FirestoreDAO:
             )
             
             doc_ref = self.client.collection(collection).document(doc_id)
-            doc = doc_ref.get()
+            doc = await doc_ref.get()
             
             if doc.exists:
                 logger.info(
@@ -141,7 +141,7 @@ class FirestoreDAO:
             )
             
             doc_ref = self.client.collection(collection).document(doc_id)
-            doc_ref.set(data, merge=merge)
+            await doc_ref.set(data, merge=merge)
             
             logger.info(
                 f"Document set successfully",
