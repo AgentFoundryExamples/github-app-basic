@@ -1,4 +1,4 @@
-# agent-foundry-template
+# github-app-basic
 
 ├── .github
   ├── af-config

@@ -1,6 +1,6 @@
 {
   "type": "directory",
-  "name": "agent-foundry-template",
+  "name": "github-app-basic",
   "children": [
     {
       "type": "directory",
