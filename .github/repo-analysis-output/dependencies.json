@@ -200,8 +200,10 @@
       "type": "file",
       "external_dependencies": {
         "stdlib": [
+          "asyncio",
           "datetime.datetime",
           "datetime.timedelta",
+          "datetime.timezone",
           "secrets",
           "time",
           "typing.Any",
@@ -404,6 +406,52 @@
           "pytest"
         ]
       }
+    },
+    {
+      "id": "tests/test_token_refresh.py",
+      "path": "tests/test_token_refresh.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "datetime.datetime",
+          "datetime.timedelta",
+          "datetime.timezone",
+          "unittest.mock.AsyncMock",
+          "unittest.mock.Mock",
+          "unittest.mock.patch"
+        ],
+        "third-party": [
+          "cryptography.hazmat.backends.default_backend",
+          "cryptography.hazmat.primitives.asymmetric.rsa",
+          "cryptography.hazmat.primitives.serialization",
+          "httpx",
+          "pytest"
+        ]
+      }
+    },
+    {
+      "id": "tests/test_token_refresh_integration.py",
+      "path": "tests/test_token_refresh_integration.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "datetime.datetime",
+          "datetime.timedelta",
+          "datetime.timezone",
+          "logging",
+          "secrets",
+          "unittest.mock.AsyncMock",
+          "unittest.mock.Mock",
+          "unittest.mock.patch"
+        ],
+        "third-party": [
+          "cryptography.hazmat.backends.default_backend",
+          "cryptography.hazmat.primitives.asymmetric.rsa",
+          "cryptography.hazmat.primitives.serialization",
+          "google.cloud.firestore",
+          "pytest"
+        ]
+      }
     }
   ],
   "edges": [
@@ -550,6 +598,18 @@
     {
       "source": "tests/test_oauth_flow.py",
       "target": "app/dependencies/firestore.py"
+    },
+    {
+      "source": "tests/test_token_refresh.py",
+      "target": "app/services/github.py"
+    },
+    {
+      "source": "tests/test_token_refresh_integration.py",
+      "target": "app/services/github.py"
+    },
+    {
+      "source": "tests/test_token_refresh_integration.py",
+      "target": "app/dao/firestore_dao.py"
     }
   ],
   "external_dependencies_summary": {

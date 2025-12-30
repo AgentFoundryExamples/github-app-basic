@@ -8,8 +8,8 @@ Includes classification of external dependencies as stdlib vs third-party.
 
 ## Statistics
 
-- **Total files**: 25
-- **Intra-repo dependencies**: 36
+- **Total files**: 27
+- **Intra-repo dependencies**: 39
 - **External stdlib dependencies**: 29
 - **External third-party dependencies**: 32
 
@@ -71,11 +71,11 @@ Total: 32 unique packages
 
 - `app/config.py` (9 dependents)
 - `app/utils/logging.py` (8 dependents)
-- `app/dao/firestore_dao.py` (4 dependents)
+- `app/dao/firestore_dao.py` (5 dependents)
 - `app/dependencies/firestore.py` (4 dependents)
+- `app/services/github.py` (4 dependents)
 - `app/main.py` (3 dependents)
 - `app/services/firestore.py` (2 dependents)
-- `app/services/github.py` (2 dependents)
 - `app/routes/health.py` (1 dependents)
 - `app/routes/oauth.py` (1 dependents)
 - `app/routes/admin.py` (1 dependents)
@@ -90,5 +90,5 @@ Total: 32 unique packages
 - `tests/test_oauth_flow.py` (4 dependencies)
 - `app/services/firestore.py` (2 dependencies)
 - `tests/test_health.py` (2 dependencies)
+- `tests/test_token_refresh_integration.py` (2 dependencies)
 - `app/dao/firestore_dao.py` (1 dependencies)
-- `app/services/github.py` (1 dependencies)

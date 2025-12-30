@@ -4,7 +4,7 @@ Heuristic summaries of source files based on filenames, extensions, and paths.
 
 Schema Version: 2.0
 
-Total files: 25
+Total files: 27
 
 ## app/__init__.py
 **Language:** Python  
@@ -128,8 +128,8 @@ Total files: 25
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for github  
-**Size:** 12.17 KB  
-**LOC:** 264  
+**Size:** 29.15 KB  
+**LOC:** 562  
 **TODOs/FIXMEs:** 0  
 
 ## app/utils/__init__.py
@@ -229,4 +229,22 @@ Total files: 25
 **Summary:** Python test file (role: test)  
 **Size:** 47.23 KB  
 **LOC:** 897  
+**TODOs/FIXMEs:** 0  
+
+## tests/test_token_refresh.py
+**Language:** Python  
+**Role:** test  
+**Role Justification:** filename starts with 'test_'  
+**Summary:** Python test file (role: test)  
+**Size:** 26.59 KB  
+**LOC:** 540  
+**TODOs/FIXMEs:** 0  
+
+## tests/test_token_refresh_integration.py
+**Language:** Python  
+**Role:** test  
+**Role Justification:** filename starts with 'test_'  
+**Summary:** Python test file (role: test)  
+**Size:** 15.22 KB  
+**LOC:** 289  
 **TODOs/FIXMEs:** 0  

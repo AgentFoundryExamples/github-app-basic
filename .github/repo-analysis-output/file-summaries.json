@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "total_files": 25,
+  "total_files": 27,
   "files": [
     {
       "schema_version": "2.0",
@@ -193,8 +193,8 @@
       "summary": "Python module for github",
       "summary_text": "Python module for github",
       "metrics": {
-        "size_bytes": 12463,
-        "loc": 264,
+        "size_bytes": 29845,
+        "loc": 562,
         "todo_count": 0
       }
     },
@@ -349,6 +349,34 @@
       "metrics": {
         "size_bytes": 48362,
         "loc": 897,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "tests/test_token_refresh.py",
+      "language": "Python",
+      "role": "test",
+      "role_justification": "filename starts with 'test_'",
+      "summary": "Python test file (role: test)",
+      "summary_text": "Python test file (role: test)",
+      "metrics": {
+        "size_bytes": 27233,
+        "loc": 540,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "tests/test_token_refresh_integration.py",
+      "language": "Python",
+      "role": "test",
+      "role_justification": "filename starts with 'test_'",
+      "summary": "Python test file (role: test)",
+      "summary_text": "Python test file (role: test)",
+      "metrics": {
+        "size_bytes": 15582,
+        "loc": 289,
         "todo_count": 0
       }
     }
