@@ -252,3 +252,59 @@ MIIEpAIBAAKCAQEA1234
         
         with pytest.raises(ValueError, match="cannot be empty or whitespace-only"):
             Settings(_env_file=None)
+    
+    def test_token_refresh_threshold_default(self, monkeypatch):
+        """Test that token refresh threshold has correct default."""
+        monkeypatch.setenv("APP_ENV", "dev")
+        
+        settings = Settings(_env_file=None)
+        assert settings.token_refresh_threshold_minutes == 30
+    
+    def test_token_refresh_cooldown_default(self, monkeypatch):
+        """Test that token refresh cooldown has correct default."""
+        monkeypatch.setenv("APP_ENV", "dev")
+        
+        settings = Settings(_env_file=None)
+        assert settings.token_refresh_cooldown_seconds == 300
+    
+    def test_token_refresh_threshold_custom_value(self, monkeypatch):
+        """Test that token refresh threshold can be customized."""
+        monkeypatch.setenv("TOKEN_REFRESH_THRESHOLD_MINUTES", "60")
+        
+        settings = Settings(_env_file=None)
+        assert settings.token_refresh_threshold_minutes == 60
+    
+    def test_token_refresh_cooldown_custom_value(self, monkeypatch):
+        """Test that token refresh cooldown can be customized."""
+        monkeypatch.setenv("TOKEN_REFRESH_COOLDOWN_SECONDS", "600")
+        
+        settings = Settings(_env_file=None)
+        assert settings.token_refresh_cooldown_seconds == 600
+    
+    def test_token_refresh_threshold_zero_raises_error(self, monkeypatch):
+        """Test that zero threshold raises validation error."""
+        monkeypatch.setenv("TOKEN_REFRESH_THRESHOLD_MINUTES", "0")
+        
+        with pytest.raises(ValueError, match="must be a positive integer"):
+            Settings(_env_file=None)
+    
+    def test_token_refresh_threshold_negative_raises_error(self, monkeypatch):
+        """Test that negative threshold raises validation error."""
+        monkeypatch.setenv("TOKEN_REFRESH_THRESHOLD_MINUTES", "-10")
+        
+        with pytest.raises(ValueError, match="must be a positive integer"):
+            Settings(_env_file=None)
+    
+    def test_token_refresh_cooldown_zero_raises_error(self, monkeypatch):
+        """Test that zero cooldown raises validation error."""
+        monkeypatch.setenv("TOKEN_REFRESH_COOLDOWN_SECONDS", "0")
+        
+        with pytest.raises(ValueError, match="must be a positive integer"):
+            Settings(_env_file=None)
+    
+    def test_token_refresh_cooldown_negative_raises_error(self, monkeypatch):
+        """Test that negative cooldown raises validation error."""
+        monkeypatch.setenv("TOKEN_REFRESH_COOLDOWN_SECONDS", "-300")
+        
+        with pytest.raises(ValueError, match="must be a positive integer"):
+            Settings(_env_file=None)

@@ -1033,3 +1033,419 @@ class TestConfigValidation:
                 github_oauth_redirect_uri="https://example.com/callback",
                 # Missing github_token_encryption_key
             )
+
+
+class TestTokenRefreshMetadata:
+    """Test suite for token refresh metadata fields."""
+    
+    @pytest.fixture
+    def encryption_key(self):
+        """Generate a valid 32-byte hex encryption key."""
+        import secrets
+        return secrets.token_hex(32)
+    
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock Firestore async client."""
+        return Mock(spec=firestore.AsyncClient)
+    
+    @pytest.fixture
+    def dao(self, mock_client, encryption_key):
+        """Create a FirestoreDAO instance with encryption."""
+        return FirestoreDAO(mock_client, encryption_key=encryption_key)
+    
+    @pytest.mark.asyncio
+    async def test_save_token_with_refresh_metadata(self, dao, mock_client):
+        """Test saving token with refresh metadata fields."""
+        # Setup mock
+        mock_doc_ref = Mock()
+        mock_doc_ref.set = AsyncMock()
+        mock_collection = Mock()
+        mock_collection.document.return_value = mock_doc_ref
+        mock_client.collection.return_value = mock_collection
+        
+        access_token = "ghs_test_token"
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        last_refresh_attempt = datetime.now(timezone.utc) - timedelta(minutes=5)
+        
+        # Execute
+        result = await dao.save_github_token(
+            collection="github_tokens",
+            doc_id="primary_user",
+            access_token=access_token,
+            expires_at=expires_at,
+            last_refresh_attempt=last_refresh_attempt,
+            last_refresh_status="success",
+            last_refresh_error=None
+        )
+        
+        # Verify
+        assert result["last_refresh_attempt"] == last_refresh_attempt.isoformat()
+        assert result["last_refresh_status"] == "success"
+        assert result["last_refresh_error"] is None
+        
+        # Verify Firestore call
+        call_args = mock_doc_ref.set.call_args[0][0]
+        assert call_args["last_refresh_attempt"] == last_refresh_attempt.isoformat()
+        assert call_args["last_refresh_status"] == "success"
+        assert call_args["last_refresh_error"] is None
+    
+    @pytest.mark.asyncio
+    async def test_save_token_with_refresh_error(self, dao, mock_client):
+        """Test saving token with refresh error."""
+        # Setup mock
+        mock_doc_ref = Mock()
+        mock_doc_ref.set = AsyncMock()
+        mock_collection = Mock()
+        mock_collection.document.return_value = mock_doc_ref
+        mock_client.collection.return_value = mock_collection
+        
+        last_refresh_attempt = datetime.now(timezone.utc)
+        
+        # Execute
+        result = await dao.save_github_token(
+            collection="github_tokens",
+            doc_id="primary_user",
+            access_token="ghs_test_token",
+            last_refresh_attempt=last_refresh_attempt,
+            last_refresh_status="failed",
+            last_refresh_error="Token refresh API returned 403"
+        )
+        
+        # Verify
+        assert result["last_refresh_status"] == "failed"
+        assert result["last_refresh_error"] == "Token refresh API returned 403"
+    
+    @pytest.mark.asyncio
+    async def test_save_token_without_refresh_metadata(self, dao, mock_client):
+        """Test saving token without refresh metadata uses None defaults."""
+        # Setup mock
+        mock_doc_ref = Mock()
+        mock_doc_ref.set = AsyncMock()
+        mock_collection = Mock()
+        mock_collection.document.return_value = mock_doc_ref
+        mock_client.collection.return_value = mock_collection
+        
+        # Execute with only required fields
+        result = await dao.save_github_token(
+            collection="github_tokens",
+            doc_id="primary_user",
+            access_token="ghs_test_token"
+        )
+        
+        # Verify refresh metadata defaults to None
+        assert result["last_refresh_attempt"] is None
+        assert result["last_refresh_status"] is None
+        assert result["last_refresh_error"] is None
+    
+    @pytest.mark.asyncio
+    async def test_save_token_with_naive_refresh_attempt_raises_error(self, dao, mock_client):
+        """Test that saving token with naive refresh attempt datetime raises error."""
+        # Setup mock
+        mock_doc_ref = Mock()
+        mock_doc_ref.set = AsyncMock()
+        mock_collection = Mock()
+        mock_collection.document.return_value = mock_doc_ref
+        mock_client.collection.return_value = mock_collection
+        
+        # Create naive datetime
+        naive_datetime = datetime(2025, 12, 30, 12, 0, 0)
+        
+        # Execute and verify error
+        with pytest.raises(ValueError, match="last_refresh_attempt must be timezone-aware"):
+            await dao.save_github_token(
+                collection="github_tokens",
+                doc_id="primary_user",
+                access_token="test_token",
+                last_refresh_attempt=naive_datetime
+            )
+    
+    @pytest.mark.asyncio
+    async def test_get_token_handles_missing_refresh_metadata(self, dao, mock_client):
+        """Test retrieving legacy token without refresh metadata."""
+        # Setup: Legacy token document without new fields
+        access_token = "ghs_test_token"
+        encrypted_access = dao._encrypt_token(access_token)
+        
+        # Setup mock to return legacy document (missing refresh fields)
+        mock_doc = Mock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = {
+            "access_token": encrypted_access,
+            "token_type": "bearer",
+            "scope": "repo",
+            "expires_at": "2025-12-31T23:59:59+00:00",
+            "refresh_token": None,
+            "updated_at": "2025-12-30T12:00:00+00:00"
+            # Missing: last_refresh_attempt, last_refresh_status, last_refresh_error
+        }
+        
+        mock_doc_ref = Mock()
+        mock_doc_ref.get = AsyncMock(return_value=mock_doc)
+        mock_collection = Mock()
+        mock_collection.document.return_value = mock_doc_ref
+        mock_client.collection.return_value = mock_collection
+        
+        # Execute
+        result = await dao.get_github_token(
+            collection="github_tokens",
+            doc_id="primary_user",
+            decrypt=True
+        )
+        
+        # Verify legacy fields are present
+        assert result is not None
+        assert result["access_token"] == access_token
+        assert result["token_type"] == "bearer"
+        
+        # Verify new fields default to None (no KeyError)
+        assert result["last_refresh_attempt"] is None
+        assert result["last_refresh_status"] is None
+        assert result["last_refresh_error"] is None
+    
+    @pytest.mark.asyncio
+    async def test_get_token_metadata_includes_refresh_fields(self, dao, mock_client):
+        """Test metadata includes refresh fields."""
+        encrypted_token = "encrypted_data"
+        
+        # Setup mock with all fields
+        mock_doc = Mock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = {
+            "access_token": encrypted_token,
+            "token_type": "bearer",
+            "scope": "repo,user",
+            "expires_at": "2025-12-31T23:59:59+00:00",
+            "refresh_token": None,
+            "last_refresh_attempt": "2025-12-30T10:00:00+00:00",
+            "last_refresh_status": "success",
+            "last_refresh_error": None,
+            "updated_at": "2025-12-30T12:00:00+00:00"
+        }
+        
+        mock_doc_ref = Mock()
+        mock_doc_ref.get = AsyncMock(return_value=mock_doc)
+        mock_collection = Mock()
+        mock_collection.document.return_value = mock_doc_ref
+        mock_client.collection.return_value = mock_collection
+        
+        # Execute
+        result = await dao.get_github_token_metadata(
+            collection="github_tokens",
+            doc_id="primary_user"
+        )
+        
+        # Verify metadata includes refresh fields
+        assert result is not None
+        assert result["last_refresh_attempt"] == "2025-12-30T10:00:00+00:00"
+        assert result["last_refresh_status"] == "success"
+        assert result["last_refresh_error"] is None
+
+
+class TestSerializationHelpers:
+    """Test suite for serialization helper methods."""
+    
+    def test_parse_iso_datetime_valid(self):
+        """Test parsing valid ISO datetime string."""
+        iso_string = "2025-12-31T23:59:59+00:00"
+        result = FirestoreDAO.parse_iso_datetime(iso_string)
+        
+        assert result is not None
+        assert result.year == 2025
+        assert result.month == 12
+        assert result.day == 31
+        assert result.hour == 23
+        assert result.minute == 59
+        assert result.second == 59
+        assert result.tzinfo is not None
+    
+    def test_parse_iso_datetime_with_z_suffix(self):
+        """Test parsing ISO datetime with Z suffix."""
+        iso_string = "2025-12-31T23:59:59Z"
+        result = FirestoreDAO.parse_iso_datetime(iso_string)
+        
+        assert result is not None
+        assert result.tzinfo is not None
+    
+    def test_parse_iso_datetime_naive_assumes_utc(self):
+        """Test parsing naive datetime assumes UTC."""
+        iso_string = "2025-12-31T23:59:59"
+        result = FirestoreDAO.parse_iso_datetime(iso_string)
+        
+        assert result is not None
+        assert result.tzinfo is not None
+        assert result.tzinfo == timezone.utc
+    
+    def test_parse_iso_datetime_none_returns_none(self):
+        """Test parsing None returns None."""
+        result = FirestoreDAO.parse_iso_datetime(None)
+        assert result is None
+    
+    def test_parse_iso_datetime_empty_returns_none(self):
+        """Test parsing empty string returns None."""
+        result = FirestoreDAO.parse_iso_datetime("")
+        assert result is None
+    
+    def test_parse_iso_datetime_invalid_returns_none(self):
+        """Test parsing invalid datetime string returns None."""
+        result = FirestoreDAO.parse_iso_datetime("not a datetime")
+        assert result is None
+    
+    def test_is_token_near_expiry_within_threshold(self):
+        """Test token is near expiry when within threshold."""
+        current_time = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        expires_at = datetime(2025, 12, 31, 23, 15, 0, tzinfo=timezone.utc)  # 15 minutes away
+        
+        # 15 minutes is within 30 minute threshold
+        result = FirestoreDAO.is_token_near_expiry(
+            expires_at=expires_at,
+            threshold_minutes=30,
+            current_time=current_time
+        )
+        assert result is True
+    
+    def test_is_token_near_expiry_at_threshold(self):
+        """Test token is near expiry exactly at threshold."""
+        current_time = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        expires_at = datetime(2025, 12, 31, 23, 30, 0, tzinfo=timezone.utc)  # Exactly 30 minutes away
+        
+        # Exactly at threshold should be considered near expiry
+        result = FirestoreDAO.is_token_near_expiry(
+            expires_at=expires_at,
+            threshold_minutes=30,
+            current_time=current_time
+        )
+        assert result is True
+    
+    def test_is_token_near_expiry_outside_threshold(self):
+        """Test token is not near expiry when outside threshold."""
+        current_time = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        expires_at = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)  # 60 minutes away
+        
+        # 60 minutes is outside 30 minute threshold
+        result = FirestoreDAO.is_token_near_expiry(
+            expires_at=expires_at,
+            threshold_minutes=30,
+            current_time=current_time
+        )
+        assert result is False
+    
+    def test_is_token_near_expiry_already_expired(self):
+        """Test expired token is considered near expiry."""
+        current_time = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        expires_at = datetime(2025, 12, 31, 22, 0, 0, tzinfo=timezone.utc)  # 1 hour ago
+        
+        # Expired tokens should be near expiry
+        result = FirestoreDAO.is_token_near_expiry(
+            expires_at=expires_at,
+            threshold_minutes=30,
+            current_time=current_time
+        )
+        assert result is True
+    
+    def test_is_token_near_expiry_non_expiring_returns_false(self):
+        """Test non-expiring token (None expires_at) returns False."""
+        current_time = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        
+        # Non-expiring tokens are never near expiry
+        result = FirestoreDAO.is_token_near_expiry(
+            expires_at=None,
+            threshold_minutes=30,
+            current_time=current_time
+        )
+        assert result is False
+    
+    def test_is_token_near_expiry_uses_current_time_default(self):
+        """Test that is_token_near_expiry uses current time when not provided."""
+        # Token expires 1 minute from now
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=1)
+        
+        # Should be near expiry with 30 minute threshold
+        result = FirestoreDAO.is_token_near_expiry(
+            expires_at=expires_at,
+            threshold_minutes=30
+        )
+        assert result is True
+    
+    def test_is_token_near_expiry_naive_datetime_raises_error(self):
+        """Test that naive datetime raises ValueError."""
+        naive_datetime = datetime(2025, 12, 31, 23, 0, 0)
+        
+        with pytest.raises(ValueError, match="must be timezone-aware"):
+            FirestoreDAO.is_token_near_expiry(
+                expires_at=naive_datetime,
+                threshold_minutes=30
+            )
+    
+    def test_is_token_near_expiry_naive_current_time_raises_error(self):
+        """Test that naive current_time parameter raises ValueError."""
+        expires_at = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        naive_current_time = datetime(2025, 12, 31, 22, 0, 0)  # No timezone
+        
+        with pytest.raises(ValueError, match="current_time must be timezone-aware"):
+            FirestoreDAO.is_token_near_expiry(
+                expires_at=expires_at,
+                threshold_minutes=30,
+                current_time=naive_current_time
+            )
+    
+    def test_is_token_expired_true(self):
+        """Test token is expired when current time >= expiry."""
+        current_time = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        expires_at = datetime(2025, 12, 31, 22, 0, 0, tzinfo=timezone.utc)  # 1 hour ago
+        
+        result = FirestoreDAO.is_token_expired(
+            expires_at=expires_at,
+            current_time=current_time
+        )
+        assert result is True
+    
+    def test_is_token_expired_false(self):
+        """Test token is not expired when current time < expiry."""
+        current_time = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        expires_at = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)  # 1 hour from now
+        
+        result = FirestoreDAO.is_token_expired(
+            expires_at=expires_at,
+            current_time=current_time
+        )
+        assert result is False
+    
+    def test_is_token_expired_exactly_at_expiry(self):
+        """Test token is expired exactly at expiry time."""
+        current_time = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        expires_at = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)  # Same time
+        
+        result = FirestoreDAO.is_token_expired(
+            expires_at=expires_at,
+            current_time=current_time
+        )
+        assert result is True
+    
+    def test_is_token_expired_non_expiring_returns_false(self):
+        """Test non-expiring token (None expires_at) returns False."""
+        current_time = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        
+        result = FirestoreDAO.is_token_expired(
+            expires_at=None,
+            current_time=current_time
+        )
+        assert result is False
+    
+    def test_is_token_expired_naive_datetime_raises_error(self):
+        """Test that naive datetime raises ValueError."""
+        naive_datetime = datetime(2025, 12, 31, 23, 0, 0)
+        
+        with pytest.raises(ValueError, match="must be timezone-aware"):
+            FirestoreDAO.is_token_expired(expires_at=naive_datetime)
+    
+    def test_is_token_expired_naive_current_time_raises_error(self):
+        """Test that naive current_time parameter raises ValueError."""
+        expires_at = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        naive_current_time = datetime(2025, 12, 31, 22, 0, 0)  # No timezone
+        
+        with pytest.raises(ValueError, match="current_time must be timezone-aware"):
+            FirestoreDAO.is_token_expired(
+                expires_at=expires_at,
+                current_time=naive_current_time
+            )
