@@ -16,6 +16,8 @@
 This module provides the main FastAPI application with:
 - Configuration management
 - Structured logging
+- Request logging middleware (optional, config-gated)
+- Prometheus metrics (optional, config-gated)
 - Health check endpoints
 - OpenAPI documentation
 - Optional CORS middleware (disabled by default)
@@ -24,12 +26,21 @@ This module provides the main FastAPI application with:
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 import logging
+import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 
 from app.config import get_settings, Settings
-from app.utils.logging import setup_logging, request_id_var, get_logger
+from app.utils.logging import setup_logging, request_id_var, get_logger, log_structured_event
+from app.utils.metrics import (
+    init_metrics,
+    get_metrics,
+    is_metrics_enabled,
+    increment_counter,
+    METRIC_HTTP_REQUESTS_TOTAL
+)
 from app.routes import health, oauth, admin, token
 
 
@@ -47,19 +58,32 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
     
     # Startup
-    logger.info(
+    log_structured_event(
+        logger,
+        "info",
+        "application_startup",
         "Application starting",
-        extra={"extra_fields": {
-            "app_env": settings.app_env,
-            "region": settings.region,
-            "port": settings.port
-        }}
+        app_env=settings.app_env,
+        region=settings.region,
+        port=settings.port,
+        request_logging_enabled=settings.enable_request_logging,
+        metrics_enabled=settings.enable_metrics
     )
+    
+    # Initialize metrics if enabled
+    init_metrics(enabled=settings.enable_metrics)
+    if settings.enable_metrics:
+        logger.info("Metrics collection enabled - /metrics endpoint available")
     
     yield
     
     # Shutdown
-    logger.info("Application shutting down")
+    log_structured_event(
+        logger,
+        "info",
+        "application_shutdown",
+        "Application shutting down"
+    )
 
 
 def create_app() -> FastAPI:
@@ -195,6 +219,55 @@ The bearer token referenced is a GCP identity token, not the GitHub access token
         
         return response
     
+    # Add optional request logging middleware
+    if settings.enable_request_logging:
+        logger.info("Request logging middleware enabled")
+        
+        @app.middleware("http")
+        async def log_requests(request: Request, call_next):
+            """Middleware to log HTTP requests with timing information.
+            
+            Logs method, path, status code, duration, and correlation IDs.
+            Only active when ENABLE_REQUEST_LOGGING=true.
+            """
+            start_time = time.time()
+            
+            # Process request
+            response = await call_next(request)
+            
+            # Calculate duration
+            duration_ms = (time.time() - start_time) * 1000
+            
+            # Get request ID from state
+            request_id = getattr(request.state, "request_id", None)
+            
+            # Log structured request event
+            log_structured_event(
+                logger,
+                "info",
+                "http_request",
+                f"{request.method} {request.url.path}",
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+                duration_ms=round(duration_ms, 2),
+                request_id=request_id
+            )
+            
+            # Increment metrics counter if enabled
+            increment_counter(
+                METRIC_HTTP_REQUESTS_TOTAL,
+                labels={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status": str(response.status_code)
+                }
+            )
+            
+            return response
+    else:
+        logger.info("Request logging middleware disabled (default)")
+    
     # Optional CORS middleware (disabled by default)
     if settings.enable_cors:
         logger.warning(
@@ -218,6 +291,40 @@ The bearer token referenced is a GCP identity token, not the GitHub access token
     app.include_router(oauth.router, tags=["oauth"])
     app.include_router(admin.router, tags=["admin"])
     app.include_router(token.router, tags=["token"])
+    
+    # Add metrics endpoint if enabled
+    if settings.enable_metrics:
+        @app.get(
+            "/metrics",
+            summary="Prometheus Metrics",
+            description="""
+Export Prometheus-compatible metrics for monitoring.
+
+**Metrics Provided:**
+- `github_token_refresh_attempts_total`: Total token refresh attempts
+- `github_token_refresh_successes_total`: Successful token refreshes
+- `github_token_refresh_failures_total`: Failed token refreshes
+- `github_token_refresh_cooldowns_total`: Refresh attempts blocked by cooldown
+- `github_oauth_flows_started_total`: OAuth flows initiated
+- `github_oauth_flows_completed_total`: OAuth flows completed successfully
+- `github_oauth_flows_failed_total`: OAuth flows that failed
+- `http_requests_total`: HTTP requests (if request logging enabled)
+
+**Security Note:**
+This endpoint is publicly accessible but does not expose sensitive data.
+Consider adding authentication or disabling in production if not needed.
+            """,
+            response_class=PlainTextResponse,
+            tags=["observability"]
+        )
+        async def metrics_endpoint():
+            """Export Prometheus metrics."""
+            metrics = get_metrics()
+            if metrics:
+                return metrics.export_prometheus()
+            return "# Metrics not initialized\n"
+        
+        logger.info("Metrics endpoint registered at /metrics")
     
     logger.info("FastAPI application created successfully")
     
