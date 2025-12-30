@@ -168,6 +168,16 @@
     },
     {
       "type": "directory",
+      "name": "scripts",
+      "children": [
+        {
+          "type": "file",
+          "name": "reset_github_token.py"
+        }
+      ]
+    },
+    {
+      "type": "directory",
       "name": "tests",
       "children": [
         {

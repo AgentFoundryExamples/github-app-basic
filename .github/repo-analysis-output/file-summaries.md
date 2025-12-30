@@ -4,7 +4,7 @@ Heuristic summaries of source files based on filenames, extensions, and paths.
 
 Schema Version: 2.0
 
-Total files: 21
+Total files: 22
 
 ## app/__init__.py
 **Language:** Python  
@@ -92,8 +92,8 @@ Total files: 21
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for oauth  
-**Size:** 23.66 KB  
-**LOC:** 596  
+**Size:** 27.73 KB  
+**LOC:** 687  
 **TODOs/FIXMEs:** 0  
 
 ## app/services/__init__.py
@@ -150,6 +150,15 @@ Total files: 21
 **LOC:** 30  
 **TODOs/FIXMEs:** 0  
 
+## scripts/reset_github_token.py
+**Language:** Python  
+**Role:** script  
+**Role Justification:** located in 'scripts' directory  
+**Summary:** Python utility script (role: script)  
+**Size:** 6.54 KB  
+**LOC:** 144  
+**TODOs/FIXMEs:** 0  
+
 ## tests/__init__.py
 **Language:** Python  
 **Role:** test  
@@ -191,6 +200,6 @@ Total files: 21
 **Role:** test  
 **Role Justification:** filename starts with 'test_'  
 **Summary:** Python test file (role: test)  
-**Size:** 23.00 KB  
-**LOC:** 453  
+**Size:** 40.44 KB  
+**LOC:** 773  
 **TODOs/FIXMEs:** 0  

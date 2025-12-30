@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "total_files": 21,
+  "total_files": 22,
   "files": [
     {
       "schema_version": "2.0",
@@ -137,8 +137,8 @@
       "summary": "Python module for oauth",
       "summary_text": "Python module for oauth",
       "metrics": {
-        "size_bytes": 24230,
-        "loc": 596,
+        "size_bytes": 28400,
+        "loc": 687,
         "todo_count": 0
       }
     },
@@ -228,6 +228,20 @@
     },
     {
       "schema_version": "2.0",
+      "path": "scripts/reset_github_token.py",
+      "language": "Python",
+      "role": "script",
+      "role_justification": "located in 'scripts' directory",
+      "summary": "Python utility script (role: script)",
+      "summary_text": "Python utility script (role: script)",
+      "metrics": {
+        "size_bytes": 6698,
+        "loc": 144,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
       "path": "tests/__init__.py",
       "language": "Python",
       "role": "test",
@@ -291,8 +305,8 @@
       "summary": "Python test file (role: test)",
       "summary_text": "Python test file (role: test)",
       "metrics": {
-        "size_bytes": 23554,
-        "loc": 453,
+        "size_bytes": 41409,
+        "loc": 773,
         "todo_count": 0
       }
     }

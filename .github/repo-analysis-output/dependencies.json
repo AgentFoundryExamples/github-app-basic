@@ -133,6 +133,9 @@
       "type": "file",
       "external_dependencies": {
         "stdlib": [
+          "datetime.datetime",
+          "datetime.timedelta",
+          "datetime.timezone",
           "re",
           "secrets",
           "typing.Optional",
@@ -140,6 +143,7 @@
         ],
         "third-party": [
           "fastapi.APIRouter",
+          "fastapi.Depends",
           "fastapi.HTTPException",
           "fastapi.Query",
           "fastapi.Request",
@@ -236,6 +240,25 @@
       }
     },
     {
+      "id": "scripts/reset_github_token.py",
+      "path": "scripts/reset_github_token.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "argparse",
+          "asyncio",
+          "os",
+          "sys",
+          "traceback",
+          "typing.Optional"
+        ],
+        "third-party": [
+          "google.api_core.exceptions",
+          "google.cloud.firestore"
+        ]
+      }
+    },
+    {
       "id": "tests/__init__.py",
       "path": "tests/__init__.py",
       "type": "file",
@@ -306,6 +329,9 @@
         "stdlib": [
           "datetime.datetime",
           "datetime.timedelta",
+          "datetime.timezone",
+          "logging",
+          "secrets",
           "time",
           "unittest.mock.AsyncMock",
           "unittest.mock.Mock",
@@ -372,6 +398,14 @@
       "target": "app/utils/logging.py"
     },
     {
+      "source": "app/routes/oauth.py",
+      "target": "app/dao/firestore_dao.py"
+    },
+    {
+      "source": "app/routes/oauth.py",
+      "target": "app/dependencies/firestore.py"
+    },
+    {
       "source": "app/services/firestore.py",
       "target": "app/config.py"
     },
@@ -430,10 +464,16 @@
     {
       "source": "tests/test_oauth_flow.py",
       "target": "app/config.py"
+    },
+    {
+      "source": "tests/test_oauth_flow.py",
+      "target": "app/dependencies/firestore.py"
     }
   ],
   "external_dependencies_summary": {
     "stdlib": [
+      "argparse",
+      "asyncio",
       "base64",
       "contextlib.asynccontextmanager",
       "contextvars.ContextVar",
@@ -449,6 +489,7 @@
       "threading",
       "threading.Lock",
       "time",
+      "traceback",
       "typing.Any",
       "typing.AsyncIterator",
       "typing.Dict",
@@ -493,7 +534,7 @@
       "pythonjsonlogger.jsonlogger",
       "uvicorn"
     ],
-    "stdlib_count": 24,
+    "stdlib_count": 27,
     "third-party_count": 32
   }
 }

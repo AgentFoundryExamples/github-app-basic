@@ -36,6 +36,8 @@
   ├── __init__.py
   ├── config.py
   └── main.py
+├── scripts
+  └── reset_github_token.py
 ├── tests
   ├── __init__.py
   ├── test_config.py
