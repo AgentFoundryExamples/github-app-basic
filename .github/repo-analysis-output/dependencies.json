@@ -15,12 +15,14 @@
       "type": "file",
       "external_dependencies": {
         "stdlib": [
+          "logging",
           "typing.Optional"
         ],
         "third-party": [
           "pydantic.Field",
           "pydantic.ValidationError",
           "pydantic.field_validator",
+          "pydantic.model_validator",
           "pydantic_settings.BaseSettings",
           "pydantic_settings.SettingsConfigDict"
         ]
@@ -194,7 +196,9 @@
       "path": "tests/test_config.py",
       "type": "file",
       "external_dependencies": {
-        "stdlib": [],
+        "stdlib": [
+          "logging"
+        ],
         "third-party": [
           "pytest"
         ]
@@ -343,6 +347,7 @@
       "pydantic.Field",
       "pydantic.ValidationError",
       "pydantic.field_validator",
+      "pydantic.model_validator",
       "pydantic_settings.BaseSettings",
       "pydantic_settings.SettingsConfigDict",
       "pytest",
@@ -350,6 +355,6 @@
       "uvicorn"
     ],
     "stdlib_count": 16,
-    "third-party_count": 18
+    "third-party_count": 19
   }
 }
