@@ -20,7 +20,7 @@ for GitHub OAuth tokens.
 """
 
 import base64
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 from google.cloud import firestore
 from google.api_core import exceptions as gcp_exceptions
@@ -570,7 +570,6 @@ class FirestoreDAO:
         time_until_expiry = expires_at - now
         
         # Convert threshold to timedelta
-        from datetime import timedelta
         threshold = timedelta(minutes=threshold_minutes)
         
         # Token is near expiry if time remaining <= threshold
