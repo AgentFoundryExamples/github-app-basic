@@ -171,6 +171,28 @@
       }
     },
     {
+      "id": "app/routes/token.py",
+      "path": "app/routes/token.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "datetime.datetime",
+          "datetime.timedelta",
+          "datetime.timezone",
+          "typing.Optional"
+        ],
+        "third-party": [
+          "fastapi.APIRouter",
+          "fastapi.Body",
+          "fastapi.Depends",
+          "fastapi.HTTPException",
+          "fastapi.Query",
+          "pydantic.BaseModel",
+          "pydantic.Field"
+        ]
+      }
+    },
+    {
       "id": "app/services/__init__.py",
       "path": "app/services/__init__.py",
       "type": "file",
@@ -408,6 +430,30 @@
       }
     },
     {
+      "id": "tests/test_token_endpoint.py",
+      "path": "tests/test_token_endpoint.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "datetime.datetime",
+          "datetime.timedelta",
+          "datetime.timezone",
+          "secrets",
+          "unittest.mock.AsyncMock",
+          "unittest.mock.Mock",
+          "unittest.mock.patch"
+        ],
+        "third-party": [
+          "cryptography.hazmat.backends.default_backend",
+          "cryptography.hazmat.primitives.asymmetric.rsa",
+          "cryptography.hazmat.primitives.serialization",
+          "fastapi.testclient.TestClient",
+          "google.cloud.firestore",
+          "pytest"
+        ]
+      }
+    },
+    {
       "id": "tests/test_token_refresh.py",
       "path": "tests/test_token_refresh.py",
       "type": "file",
@@ -496,6 +542,10 @@
       "target": "app/routes/admin.py"
     },
     {
+      "source": "app/main.py",
+      "target": "app/routes/token.py"
+    },
+    {
       "source": "app/routes/admin.py",
       "target": "app/config.py"
     },
@@ -530,6 +580,26 @@
     {
       "source": "app/routes/oauth.py",
       "target": "app/dependencies/firestore.py"
+    },
+    {
+      "source": "app/routes/token.py",
+      "target": "app/config.py"
+    },
+    {
+      "source": "app/routes/token.py",
+      "target": "app/dao/firestore_dao.py"
+    },
+    {
+      "source": "app/routes/token.py",
+      "target": "app/dependencies/firestore.py"
+    },
+    {
+      "source": "app/routes/token.py",
+      "target": "app/services/github.py"
+    },
+    {
+      "source": "app/routes/token.py",
+      "target": "app/utils/logging.py"
     },
     {
       "source": "app/services/firestore.py",
@@ -600,6 +670,22 @@
       "target": "app/dependencies/firestore.py"
     },
     {
+      "source": "tests/test_token_endpoint.py",
+      "target": "app/main.py"
+    },
+    {
+      "source": "tests/test_token_endpoint.py",
+      "target": "app/config.py"
+    },
+    {
+      "source": "tests/test_token_endpoint.py",
+      "target": "app/services/github.py"
+    },
+    {
+      "source": "tests/test_token_endpoint.py",
+      "target": "app/dao/firestore_dao.py"
+    },
+    {
       "source": "tests/test_token_refresh.py",
       "target": "app/services/github.py"
     },
@@ -653,6 +739,7 @@
       "cryptography.hazmat.primitives.ciphers.modes",
       "cryptography.hazmat.primitives.serialization",
       "fastapi.APIRouter",
+      "fastapi.Body",
       "fastapi.Depends",
       "fastapi.FastAPI",
       "fastapi.HTTPException",
@@ -668,6 +755,7 @@
       "google.cloud.firestore",
       "httpx",
       "jwt",
+      "pydantic.BaseModel",
       "pydantic.Field",
       "pydantic.ValidationError",
       "pydantic.field_validator",
@@ -679,6 +767,6 @@
       "uvicorn"
     ],
     "stdlib_count": 29,
-    "third-party_count": 32
+    "third-party_count": 34
   }
 }

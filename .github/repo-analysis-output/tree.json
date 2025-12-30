@@ -121,6 +121,10 @@
             {
               "type": "file",
               "name": "oauth.py"
+            },
+            {
+              "type": "file",
+              "name": "token.py"
             }
           ]
         },
@@ -211,6 +215,10 @@
         {
           "type": "file",
           "name": "test_oauth_flow.py"
+        },
+        {
+          "type": "file",
+          "name": "test_token_endpoint.py"
         },
         {
           "type": "file",
