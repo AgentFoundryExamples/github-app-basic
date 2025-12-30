@@ -22,13 +22,16 @@ import secrets
 import re
 from typing import Optional
 from urllib.parse import urlencode
+from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Request, Response, HTTPException, Query
+from fastapi import APIRouter, Request, Response, HTTPException, Query, Depends
 from fastapi.responses import RedirectResponse, HTMLResponse
 
 from app.config import Settings
 from app.services.github import GitHubOAuthManager, GitHubOAuthError
 from app.utils.logging import get_logger, correlation_id_var
+from app.dao.firestore_dao import FirestoreDAO
+from app.dependencies.firestore import get_firestore_dao
 
 logger = get_logger(__name__)
 
@@ -295,6 +298,7 @@ For multi-user production deployments, implement secure token storage.
 )
 async def oauth_callback(
     request: Request,
+    dao: FirestoreDAO = Depends(get_firestore_dao),
     code: Optional[str] = Query(
         default=None,
         description="Authorization code from GitHub (provided by GitHub redirect)",
@@ -475,10 +479,67 @@ async def oauth_callback(
                 extra={"extra_fields": {"correlation_id": correlation_id}}
             )
         
-        # Log successful token exchange (token already masked in service layer)
-        token_type = token_data.get("token_type", "unknown")
+        # Calculate expires_at from expires_in if provided
+        expires_at = None
         expires_in = token_data.get("expires_in")
+        if expires_in is not None:
+            try:
+                expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+            except (ValueError, TypeError) as e:
+                logger.warning(
+                    "Failed to parse expires_in, token will be saved without expiration",
+                    extra={"extra_fields": {
+                        "correlation_id": correlation_id,
+                        "expires_in": expires_in,
+                        "error": str(e)
+                    }}
+                )
         
+        # Persist token to Firestore
+        try:
+            token_type = token_data.get("token_type", "bearer")
+            refresh_token = token_data.get("refresh_token")
+            
+            await dao.save_github_token(
+                collection=settings.github_tokens_collection,
+                doc_id=settings.github_tokens_doc_id,
+                access_token=access_token,
+                token_type=token_type,
+                scope=scope,
+                expires_at=expires_at,
+                refresh_token=refresh_token
+            )
+            
+            logger.info(
+                "GitHub token persisted to Firestore successfully",
+                extra={"extra_fields": {
+                    "correlation_id": correlation_id,
+                    "collection": settings.github_tokens_collection,
+                    "doc_id": settings.github_tokens_doc_id
+                }}
+            )
+        except Exception as e:
+            # Firestore persistence failure - this is a critical error
+            logger.error(
+                "Failed to persist GitHub token to Firestore",
+                extra={"extra_fields": {
+                    "correlation_id": correlation_id,
+                    "error": str(e)
+                }},
+                exc_info=True
+            )
+            
+            return HTMLResponse(
+                content=_render_error_page(
+                    title="Token Storage Failed",
+                    message="Failed to persist GitHub token",
+                    details="The token was obtained successfully but could not be saved. "
+                           "Please contact an administrator or try again later."
+                ),
+                status_code=503
+            )
+        
+        # Log successful token exchange (token already masked in service layer)
         logger.info(
             "OAuth flow completed successfully",
             extra={"extra_fields": {
