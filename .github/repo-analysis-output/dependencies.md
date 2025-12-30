@@ -8,19 +8,20 @@ Includes classification of external dependencies as stdlib vs third-party.
 
 ## Statistics
 
-- **Total files**: 17
+- **Total files**: 18
 - **Intra-repo dependencies**: 18
-- **External stdlib dependencies**: 15
+- **External stdlib dependencies**: 16
 - **External third-party dependencies**: 18
 
 ## External Dependencies
 
 ### Standard Library / Core Modules
 
-Total: 15 unique modules
+Total: 16 unique modules
 
 - `contextlib.asynccontextmanager`
 - `contextvars.ContextVar`
+- `http.client`
 - `logging`
 - `os`
 - `sys`

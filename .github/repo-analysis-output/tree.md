@@ -39,9 +39,13 @@
   ├── test_config.py
   ├── test_firestore_dao.py
   └── test_health.py
+├── .dockerignore
 ├── .env.example
 ├── .gitignore
+├── Dockerfile
+├── healthcheck.py
 ├── LICENSE
+├── Makefile
 ├── pyproject.toml
 ├── README.md
 ├── requirements-dev.txt

@@ -182,6 +182,10 @@
     },
     {
       "type": "file",
+      "name": ".dockerignore"
+    },
+    {
+      "type": "file",
       "name": ".env.example"
     },
     {
@@ -190,7 +194,19 @@
     },
     {
       "type": "file",
+      "name": "Dockerfile"
+    },
+    {
+      "type": "file",
+      "name": "healthcheck.py"
+    },
+    {
+      "type": "file",
       "name": "LICENSE"
+    },
+    {
+      "type": "file",
+      "name": "Makefile"
     },
     {
       "type": "file",

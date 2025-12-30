@@ -168,6 +168,19 @@
       }
     },
     {
+      "id": "healthcheck.py",
+      "path": "healthcheck.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "http.client",
+          "os",
+          "sys"
+        ],
+        "third-party": []
+      }
+    },
+    {
       "id": "tests/__init__.py",
       "path": "tests/__init__.py",
       "type": "file",
@@ -301,6 +314,7 @@
     "stdlib": [
       "contextlib.asynccontextmanager",
       "contextvars.ContextVar",
+      "http.client",
       "logging",
       "os",
       "sys",
@@ -335,7 +349,7 @@
       "pythonjsonlogger.jsonlogger",
       "uvicorn"
     ],
-    "stdlib_count": 15,
+    "stdlib_count": 16,
     "third-party_count": 18
   }
 }
