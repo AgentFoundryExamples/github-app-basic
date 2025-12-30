@@ -14,6 +14,7 @@
 """Tests for GitHub OAuth flows and JWT generation."""
 
 import time
+import secrets
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime, timedelta
@@ -364,7 +365,6 @@ class TestOAuthEndpoints:
     @pytest.fixture
     def client(self, monkeypatch):
         """Create test client with OAuth configuration."""
-        import secrets
         monkeypatch.setenv("APP_ENV", "dev")
         monkeypatch.setenv("GITHUB_CLIENT_ID", "Iv1.test123")
         monkeypatch.setenv("GITHUB_CLIENT_SECRET", "test_secret")
@@ -579,7 +579,6 @@ class TestOAuthIntegration:
     
     def test_full_oauth_flow(self, monkeypatch):
         """Test complete OAuth flow from install to callback."""
-        import secrets
         monkeypatch.setenv("APP_ENV", "dev")
         monkeypatch.setenv("GITHUB_CLIENT_ID", "Iv1.test123")
         monkeypatch.setenv("GITHUB_CLIENT_SECRET", "test_secret")
@@ -647,7 +646,6 @@ class TestOAuthFirestorePersistence:
     @pytest.fixture
     def client(self, monkeypatch):
         """Create test client with OAuth and Firestore configuration."""
-        import secrets
         monkeypatch.setenv("APP_ENV", "dev")
         monkeypatch.setenv("GITHUB_CLIENT_ID", "Iv1.test123")
         monkeypatch.setenv("GITHUB_CLIENT_SECRET", "test_secret")
@@ -1043,8 +1041,16 @@ class TestOAuthFirestorePersistence:
         
         assert response.status_code == 200
         
-        # Verify full token is NOT in logs (tokens are masked in service layer)
+        # Verify full token is NOT in logs
+        # The service layer (GitHubOAuthManager.exchange_code_for_token) masks tokens,
+        # showing only prefix (first 8 chars) + "..." + suffix (last 4 chars)
         log_text = caplog.text
-        # The service layer should mask the token, so full token shouldn't appear
-        # Note: GitHubOAuthManager.exchange_code_for_token already masks tokens in logs
-        assert "should_be_masked_1234567890" not in log_text or "gho_test_t..." in log_text
+        
+        # The full middle part should not be in logs
+        assert "should_be_masked" not in log_text, "Token middle portion should be masked in logs"
+        
+        # The masked version (prefix...suffix) may be present
+        # e.g., "gho_test..." or similar pattern
+        if full_token in log_text:
+            # If full token appears, fail the test
+            pytest.fail(f"Full token '{full_token}' should not appear in logs unmasked")
