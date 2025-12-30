@@ -1926,8 +1926,8 @@ gcloud run services get-iam-policy github-app-token-service \
 # Regenerate identity token
 IDENTITY_TOKEN=$(gcloud auth print-identity-token)
 
-# For service accounts, ensure correct audience
-# Python: credentials.refresh(auth_req) automatically sets correct audience
+# For service accounts, ensure correct audience is used
+# Python: Use google.oauth2.id_token.fetch_id_token(auth_req, service_url)
 # Node.js: Use GoogleAuth.getIdTokenClient(serviceUrl)
 ```
 
@@ -2312,18 +2312,16 @@ gcloud run services add-iam-policy-binding github-app-token-service \
 For Cloud Functions, Cloud Run, or other GCP services calling this service:
 
 ```python
-import google.auth
 import google.auth.transport.requests
+import google.oauth2.id_token
 import requests
 
 # Get the service URL
 SERVICE_URL = "https://github-app-token-service-xxxxx-uc.a.run.app"
 
-# Obtain ID token
+# Obtain ID token with proper audience
 auth_req = google.auth.transport.requests.Request()
-credentials, project = google.auth.default()
-credentials.refresh(auth_req)
-id_token = credentials.id_token
+id_token = google.oauth2.id_token.fetch_id_token(auth_req, SERVICE_URL)
 
 # Make authenticated request
 response = requests.get(
