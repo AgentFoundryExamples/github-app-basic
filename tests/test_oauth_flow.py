@@ -440,7 +440,11 @@ class TestOAuthEndpoints:
     
     def test_oauth_callback_invalid_state(self, client):
         """Test /oauth/callback fails with invalid state."""
-        response = client.get("/oauth/callback?code=test_code&state=invalid_state")
+        # Provide cookie to pass first check, but state is invalid in server store
+        response = client.get(
+            "/oauth/callback?code=test_code&state=invalid_state",
+            cookies={"oauth_state": "invalid_state"}
+        )
         
         assert response.status_code == 400
         assert b"Invalid or expired state token" in response.content
@@ -451,7 +455,11 @@ class TestOAuthEndpoints:
         state = GitHubOAuthManager.generate_state_token()
         GitHubOAuthManager._state_tokens[state] = time.time() - 10
         
-        response = client.get(f"/oauth/callback?code=test_code&state={state}")
+        # Provide cookie to pass first check
+        response = client.get(
+            f"/oauth/callback?code=test_code&state={state}",
+            cookies={"oauth_state": state}
+        )
         
         assert response.status_code == 400
         assert b"Invalid or expired state token" in response.content

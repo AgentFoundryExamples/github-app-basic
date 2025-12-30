@@ -223,7 +223,8 @@ class GitHubOAuthManager:
     def _cleanup_expired_tokens(cls) -> None:
         """Remove expired state tokens from memory."""
         now = time.time()
-        expired = [state for state, exp in cls._state_tokens.items() if now > exp]
+        # Iterate over a copy of items to avoid RuntimeError in concurrent scenarios
+        expired = [state for state, exp in list(cls._state_tokens.items()) if now > exp]
         
         for state in expired:
             cls._state_tokens.pop(state, None)
@@ -321,11 +322,12 @@ class GitHubOAuthManager:
                 
                 # Log success with masked token
                 token = data["access_token"]
-                # Show first 4 and last 4 characters for tokens >= 16 chars, otherwise fully mask
+                # Show prefix (first 8) and last 4 characters for better context
                 if len(token) >= 16:
-                    masked_token = token[:4] + "..." + token[-4:]
+                    masked_token = token[:8] + "..." + token[-4:]
                 else:
-                    masked_token = "***"
+                    # For shorter tokens, mask more conservatively
+                    masked_token = token[:4] + "..."
                 
                 logger.info(
                     "OAuth token exchange successful",

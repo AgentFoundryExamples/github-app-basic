@@ -197,6 +197,27 @@ async def oauth_callback(
         # Verify state token (CSRF protection)
         cookie_state = request.cookies.get("oauth_state")
         
+        # First, check if the state from the query parameter matches the cookie
+        if not cookie_state or cookie_state != state:
+            logger.warning(
+                "OAuth state cookie mismatch or missing",
+                extra={"extra_fields": {
+                    "correlation_id": correlation_id,
+                    "state_prefix": state[:8] + "...",
+                    "cookie_prefix": cookie_state[:8] + "..." if cookie_state else "None"
+                }}
+            )
+            
+            return HTMLResponse(
+                content=_render_error_page(
+                    title="Security Verification Failed",
+                    message="State token mismatch",
+                    details="The state token does not match the expected value. Please try again."
+                ),
+                status_code=400
+            )
+        
+        # If they match, verify the token against the server-side store (consumes it)
         if not GitHubOAuthManager.verify_state_token(state):
             logger.warning(
                 "OAuth state verification failed - invalid or expired state",
@@ -213,26 +234,6 @@ async def oauth_callback(
                     message="Invalid or expired state token",
                     details="The state token is invalid, expired, or has already been used. "
                            "Please try again from the beginning."
-                ),
-                status_code=400
-            )
-        
-        # Additional verification: check cookie state matches
-        if cookie_state and cookie_state != state:
-            logger.warning(
-                "OAuth state cookie mismatch",
-                extra={"extra_fields": {
-                    "correlation_id": correlation_id,
-                    "state_prefix": state[:8] + "...",
-                    "cookie_prefix": cookie_state[:8] + "..."
-                }}
-            )
-            
-            return HTMLResponse(
-                content=_render_error_page(
-                    title="Security Verification Failed",
-                    message="State token mismatch",
-                    details="The state token does not match the expected value."
                 ),
                 status_code=400
             )
