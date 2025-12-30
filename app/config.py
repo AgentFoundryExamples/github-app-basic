@@ -76,6 +76,16 @@ class Settings(BaseSettings):
         description="Document ID for the primary GitHub token"
     )
     
+    # Token Refresh Configuration
+    token_refresh_threshold_minutes: int = Field(
+        default=30,
+        description="Minutes before expiry to consider a token near-expiry and eligible for refresh"
+    )
+    token_refresh_cooldown_seconds: int = Field(
+        default=300,
+        description="Minimum seconds to wait between token refresh attempts (cooldown period)"
+    )
+    
     @field_validator("app_env")
     @classmethod
     def validate_app_env(cls, v: str) -> str:
@@ -127,6 +137,38 @@ class Settings(BaseSettings):
                 "Ensure the key is properly formatted and includes the BEGIN/END markers."
             )
         
+        return v
+    
+    @field_validator("token_refresh_threshold_minutes")
+    @classmethod
+    def validate_token_refresh_threshold_minutes(cls, v: int) -> int:
+        """Validate token refresh threshold is a positive integer.
+        
+        Raises:
+            ValueError: If the value is not positive.
+        """
+        if v <= 0:
+            raise ValueError(
+                f"TOKEN_REFRESH_THRESHOLD_MINUTES must be a positive integer, got {v}. "
+                "This value determines how many minutes before expiry a token is considered "
+                "near-expiry and eligible for refresh."
+            )
+        return v
+    
+    @field_validator("token_refresh_cooldown_seconds")
+    @classmethod
+    def validate_token_refresh_cooldown_seconds(cls, v: int) -> int:
+        """Validate token refresh cooldown is a positive integer.
+        
+        Raises:
+            ValueError: If the value is not positive.
+        """
+        if v <= 0:
+            raise ValueError(
+                f"TOKEN_REFRESH_COOLDOWN_SECONDS must be a positive integer, got {v}. "
+                "This value determines the minimum seconds to wait between token refresh attempts "
+                "to prevent excessive API calls."
+            )
         return v
     
     @field_validator("github_token_encryption_key", mode="before")

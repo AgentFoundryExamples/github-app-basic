@@ -304,9 +304,12 @@ class FirestoreDAO:
         token_type: str = "bearer",
         scope: Optional[str] = None,
         expires_at: Optional[datetime] = None,
-        refresh_token: Optional[str] = None
+        refresh_token: Optional[str] = None,
+        last_refresh_attempt: Optional[datetime] = None,
+        last_refresh_status: Optional[str] = None,
+        last_refresh_error: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Save GitHub OAuth token with encryption.
+        """Save GitHub OAuth token with encryption and refresh metadata.
         
         Args:
             collection: Firestore collection name.
@@ -316,6 +319,9 @@ class FirestoreDAO:
             scope: OAuth scopes granted.
             expires_at: Token expiration time (must be timezone-aware).
             refresh_token: Optional refresh token (also encrypted).
+            last_refresh_attempt: Timestamp of last refresh attempt (must be timezone-aware if provided).
+            last_refresh_status: Status of last refresh attempt (e.g., "success", "failed", "pending").
+            last_refresh_error: Error message from last refresh attempt if it failed.
             
         Returns:
             Dictionary containing the persisted metadata (without decrypted tokens).
@@ -335,6 +341,13 @@ class FirestoreDAO:
                 "ensure your datetime object has tzinfo set."
             )
         
+        # Validate last_refresh_attempt is timezone-aware if provided
+        if last_refresh_attempt is not None and last_refresh_attempt.tzinfo is None:
+            raise ValueError(
+                "last_refresh_attempt must be timezone-aware. Use datetime.now(timezone.utc) or "
+                "ensure your datetime object has tzinfo set."
+            )
+        
         # Encrypt the access token
         encrypted_access_token = self._encrypt_token(access_token)
         
@@ -351,6 +364,9 @@ class FirestoreDAO:
             "scope": scope,
             "expires_at": expires_at.isoformat() if expires_at else None,
             "refresh_token": encrypted_refresh_token,
+            "last_refresh_attempt": last_refresh_attempt.isoformat() if last_refresh_attempt else None,
+            "last_refresh_status": last_refresh_status,
+            "last_refresh_error": last_refresh_error,
             "updated_at": now_utc.isoformat()
         }
         
@@ -362,6 +378,7 @@ class FirestoreDAO:
                 "token_type": token_type,
                 "scope": scope,
                 "has_refresh_token": refresh_token is not None,
+                "last_refresh_status": last_refresh_status,
                 "access_token_preview": mask_sensitive_data(access_token, 4)
             }}
         )
@@ -375,6 +392,9 @@ class FirestoreDAO:
             "scope": scope,
             "expires_at": data["expires_at"],
             "has_refresh_token": refresh_token is not None,
+            "last_refresh_attempt": data["last_refresh_attempt"],
+            "last_refresh_status": last_refresh_status,
+            "last_refresh_error": last_refresh_error,
             "updated_at": data["updated_at"]
         }
     
@@ -386,6 +406,8 @@ class FirestoreDAO:
     ) -> Optional[Dict[str, Any]]:
         """Retrieve GitHub OAuth token with optional decryption.
         
+        Handles legacy documents missing new metadata fields by providing safe defaults.
+        
         Args:
             collection: Firestore collection name.
             doc_id: Document ID for the token.
@@ -395,6 +417,7 @@ class FirestoreDAO:
             Dictionary containing token data, or None if not found.
             If decrypt=True, includes decrypted "access_token" and "refresh_token".
             If decrypt=False, includes encrypted values as-is.
+            Legacy documents without refresh metadata will have None for those fields.
             
         Raises:
             ValueError: If decryption fails.
@@ -414,6 +437,11 @@ class FirestoreDAO:
         
         if not data:
             return None
+        
+        # Provide safe defaults for legacy documents missing new fields
+        data.setdefault("last_refresh_attempt", None)
+        data.setdefault("last_refresh_status", None)
+        data.setdefault("last_refresh_error", None)
         
         if decrypt:
             # Decrypt access token
@@ -443,8 +471,10 @@ class FirestoreDAO:
             doc_id: Document ID for the token.
             
         Returns:
-            Dictionary containing metadata (token_type, scope, expires_at, updated_at),
+            Dictionary containing metadata (token_type, scope, expires_at, updated_at,
+            last_refresh_attempt, last_refresh_status, last_refresh_error),
             or None if not found. Does not include decrypted tokens.
+            Legacy documents will have None for missing refresh metadata fields.
             
         Raises:
             PermissionError: If Firestore access is denied.
@@ -461,5 +491,122 @@ class FirestoreDAO:
             "scope": data.get("scope"),
             "expires_at": data.get("expires_at"),
             "has_refresh_token": data.get("refresh_token") is not None,
+            "last_refresh_attempt": data.get("last_refresh_attempt"),
+            "last_refresh_status": data.get("last_refresh_status"),
+            "last_refresh_error": data.get("last_refresh_error"),
             "updated_at": data.get("updated_at")
         }
+    
+    @staticmethod
+    def parse_iso_datetime(iso_string: Optional[str]) -> Optional[datetime]:
+        """Parse ISO 8601 datetime string to timezone-aware datetime.
+        
+        Args:
+            iso_string: ISO 8601 formatted datetime string (e.g., "2025-12-31T23:59:59+00:00").
+            
+        Returns:
+            Timezone-aware datetime object, or None if input is None or invalid.
+        """
+        if not iso_string:
+            return None
+        
+        try:
+            # Parse ISO format - fromisoformat handles timezone info
+            dt = datetime.fromisoformat(iso_string)
+            
+            # Ensure timezone-aware - if naive, assume UTC
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            
+            return dt
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                f"Failed to parse datetime string: {iso_string}",
+                extra={"extra_fields": {"error": str(e)}}
+            )
+            return None
+    
+    @staticmethod
+    def is_token_near_expiry(
+        expires_at: Optional[datetime],
+        threshold_minutes: int,
+        current_time: Optional[datetime] = None
+    ) -> bool:
+        """Check if a token is near expiry based on configured threshold.
+        
+        A token is considered near-expiry if:
+        - It has an expires_at datetime AND
+        - The time until expiry is less than or equal to threshold_minutes
+        
+        Tokens without expires_at are considered non-expiring and return False.
+        
+        Args:
+            expires_at: Token expiration datetime (must be timezone-aware if provided).
+            threshold_minutes: Minutes before expiry to consider token near-expiry.
+            current_time: Optional current time for testing. Defaults to datetime.now(timezone.utc).
+            
+        Returns:
+            True if token is near expiry, False if not near expiry or non-expiring.
+            
+        Raises:
+            ValueError: If expires_at is provided but not timezone-aware.
+        """
+        # Non-expiring tokens (missing expires_at) are never near expiry
+        if expires_at is None:
+            return False
+        
+        # Validate timezone-aware
+        if expires_at.tzinfo is None:
+            raise ValueError("expires_at must be timezone-aware")
+        
+        # Get current time
+        now = current_time if current_time is not None else datetime.now(timezone.utc)
+        
+        # Validate current_time is timezone-aware
+        if now.tzinfo is None:
+            raise ValueError("current_time must be timezone-aware")
+        
+        # Calculate time until expiry
+        time_until_expiry = expires_at - now
+        
+        # Convert threshold to timedelta
+        from datetime import timedelta
+        threshold = timedelta(minutes=threshold_minutes)
+        
+        # Token is near expiry if time remaining <= threshold
+        return time_until_expiry <= threshold
+    
+    @staticmethod
+    def is_token_expired(
+        expires_at: Optional[datetime],
+        current_time: Optional[datetime] = None
+    ) -> bool:
+        """Check if a token has already expired.
+        
+        Args:
+            expires_at: Token expiration datetime (must be timezone-aware if provided).
+            current_time: Optional current time for testing. Defaults to datetime.now(timezone.utc).
+            
+        Returns:
+            True if token is expired, False if not expired or non-expiring.
+            
+        Raises:
+            ValueError: If expires_at is provided but not timezone-aware.
+        """
+        # Non-expiring tokens (missing expires_at) never expire
+        if expires_at is None:
+            return False
+        
+        # Validate timezone-aware
+        if expires_at.tzinfo is None:
+            raise ValueError("expires_at must be timezone-aware")
+        
+        # Get current time
+        now = current_time if current_time is not None else datetime.now(timezone.utc)
+        
+        # Validate current_time is timezone-aware
+        if now.tzinfo is None:
+            raise ValueError("current_time must be timezone-aware")
+        
+        # Token is expired if current time >= expiry time
+        return now >= expires_at
