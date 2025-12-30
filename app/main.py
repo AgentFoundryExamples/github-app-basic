@@ -30,7 +30,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings, Settings
 from app.utils.logging import setup_logging, request_id_var, get_logger
-from app.routes import health
+from app.routes import health, oauth
 
 
 @asynccontextmanager
@@ -145,6 +145,7 @@ def create_app() -> FastAPI:
     
     # Register routers
     app.include_router(health.router, tags=["health"])
+    app.include_router(oauth.router, tags=["oauth"])
     
     logger.info("FastAPI application created successfully")
     
