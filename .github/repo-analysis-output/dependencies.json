@@ -45,6 +45,7 @@
         "stdlib": [
           "base64",
           "datetime.datetime",
+          "datetime.timedelta",
           "datetime.timezone",
           "secrets",
           "typing.Any",
