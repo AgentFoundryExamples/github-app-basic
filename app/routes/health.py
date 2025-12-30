@@ -66,9 +66,9 @@ async def check_firestore_health(settings: Settings) -> Dict[str, Any]:
             collections = client.collections()
             # Get at least one collection to confirm connectivity
             # This forces actual network communication with Firestore
-            collection_list = []
             async for collection in collections:
-                collection_list.append(collection.id)
+                # Access collection.id to force network communication
+                _ = collection.id
                 break  # Only need one to validate connectivity
             # If we get here without error, connectivity is confirmed
             return True
