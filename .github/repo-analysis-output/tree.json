@@ -157,6 +157,10 @@
             {
               "type": "file",
               "name": "logging.py"
+            },
+            {
+              "type": "file",
+              "name": "security.py"
             }
           ]
         },
@@ -202,6 +206,10 @@
         },
         {
           "type": "file",
+          "name": "test_admin_endpoint_security.py"
+        },
+        {
+          "type": "file",
           "name": "test_config.py"
         },
         {
@@ -215,6 +223,10 @@
         {
           "type": "file",
           "name": "test_oauth_flow.py"
+        },
+        {
+          "type": "file",
+          "name": "test_security_utils.py"
         },
         {
           "type": "file",
@@ -273,6 +285,10 @@
     {
       "type": "file",
       "name": "requirements.txt"
+    },
+    {
+      "type": "file",
+      "name": "SECURITY.md"
     }
   ]
 }

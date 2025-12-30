@@ -4,7 +4,7 @@ Heuristic summaries of source files based on filenames, extensions, and paths.
 
 Schema Version: 2.0
 
-Total files: 29
+Total files: 32
 
 ## app/__init__.py
 **Language:** Python  
@@ -38,8 +38,8 @@ Total files: 29
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for firestore dao  
-**Size:** 23.14 KB  
-**LOC:** 462  
+**Size:** 23.23 KB  
+**LOC:** 463  
 **TODOs/FIXMEs:** 0  
 
 ## app/dependencies/__init__.py
@@ -83,8 +83,8 @@ Total files: 29
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for admin  
-**Size:** 6.55 KB  
-**LOC:** 161  
+**Size:** 6.65 KB  
+**LOC:** 162  
 **TODOs/FIXMEs:** 0  
 
 ## app/routes/health.py
@@ -101,8 +101,8 @@ Total files: 29
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for oauth  
-**Size:** 27.73 KB  
-**LOC:** 687  
+**Size:** 27.98 KB  
+**LOC:** 688  
 **TODOs/FIXMEs:** 0  
 
 ## app/routes/token.py
@@ -110,8 +110,8 @@ Total files: 29
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for token  
-**Size:** 17.31 KB  
-**LOC:** 371  
+**Size:** 17.64 KB  
+**LOC:** 374  
 **TODOs/FIXMEs:** 0  
 
 ## app/services/__init__.py
@@ -128,8 +128,8 @@ Total files: 29
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for firestore  
-**Size:** 4.24 KB  
-**LOC:** 70  
+**Size:** 4.34 KB  
+**LOC:** 71  
 **TODOs/FIXMEs:** 0  
 
 ## app/services/github.py
@@ -137,8 +137,8 @@ Total files: 29
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for github  
-**Size:** 29.15 KB  
-**LOC:** 562  
+**Size:** 29.14 KB  
+**LOC:** 560  
 **TODOs/FIXMEs:** 0  
 
 ## app/utils/__init__.py
@@ -155,8 +155,17 @@ Total files: 29
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for logging  
-**Size:** 4.50 KB  
-**LOC:** 84  
+**Size:** 4.59 KB  
+**LOC:** 82  
+**TODOs/FIXMEs:** 0  
+
+## app/utils/security.py
+**Language:** Python  
+**Role:** implementation  
+**Role Justification:** general implementation file (default classification)  
+**Summary:** Python module for security  
+**Size:** 11.41 KB  
+**LOC:** 238  
 **TODOs/FIXMEs:** 0  
 
 ## healthcheck.py
@@ -204,6 +213,15 @@ Total files: 29
 **LOC:** 263  
 **TODOs/FIXMEs:** 0  
 
+## tests/test_admin_endpoint_security.py
+**Language:** Python  
+**Role:** test  
+**Role Justification:** filename starts with 'test_'  
+**Summary:** Python test file (role: test)  
+**Size:** 4.96 KB  
+**LOC:** 78  
+**TODOs/FIXMEs:** 0  
+
 ## tests/test_config.py
 **Language:** Python  
 **Role:** test  
@@ -218,8 +236,8 @@ Total files: 29
 **Role:** test  
 **Role Justification:** filename starts with 'test_'  
 **Summary:** Python test file (role: test)  
-**Size:** 55.86 KB  
-**LOC:** 1050  
+**Size:** 56.24 KB  
+**LOC:** 1051  
 **TODOs/FIXMEs:** 0  
 
 ## tests/test_health.py
@@ -238,6 +256,15 @@ Total files: 29
 **Summary:** Python test file (role: test)  
 **Size:** 47.23 KB  
 **LOC:** 897  
+**TODOs/FIXMEs:** 0  
+
+## tests/test_security_utils.py
+**Language:** Python  
+**Role:** test  
+**Role Justification:** filename starts with 'test_'  
+**Summary:** Python test file (role: test)  
+**Size:** 19.59 KB  
+**LOC:** 379  
 **TODOs/FIXMEs:** 0  
 
 ## tests/test_token_endpoint.py

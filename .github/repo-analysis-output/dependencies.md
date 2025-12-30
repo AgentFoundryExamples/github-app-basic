@@ -8,16 +8,16 @@ Includes classification of external dependencies as stdlib vs third-party.
 
 ## Statistics
 
-- **Total files**: 29
-- **Intra-repo dependencies**: 49
-- **External stdlib dependencies**: 29
+- **Total files**: 32
+- **Intra-repo dependencies**: 58
+- **External stdlib dependencies**: 31
 - **External third-party dependencies**: 35
 
 ## External Dependencies
 
 ### Standard Library / Core Modules
 
-Total: 29 unique modules
+Total: 31 unique modules
 
 - `argparse`
 - `asyncio`
@@ -39,7 +39,7 @@ Total: 29 unique modules
 - `threading.Lock`
 - `time`
 - `traceback`
-- ... and 9 more (see JSON for full list)
+- ... and 11 more (see JSON for full list)
 
 ### Third-Party Packages
 
@@ -71,24 +71,24 @@ Total: 35 unique packages
 
 - `app/config.py` (11 dependents)
 - `app/utils/logging.py` (9 dependents)
-- `app/dao/firestore_dao.py` (7 dependents)
+- `app/utils/security.py` (8 dependents)
+- `app/dao/firestore_dao.py` (8 dependents)
 - `app/services/github.py` (6 dependents)
 - `app/dependencies/firestore.py` (5 dependents)
 - `app/main.py` (4 dependents)
 - `app/services/firestore.py` (2 dependents)
 - `app/routes/health.py` (1 dependents)
 - `app/routes/oauth.py` (1 dependents)
-- `app/routes/admin.py` (1 dependents)
 
 ## Files with Most Dependencies (Intra-Repo)
 
 - `app/main.py` (6 dependencies)
+- `app/routes/oauth.py` (6 dependencies)
+- `app/routes/token.py` (6 dependencies)
 - `tests/test_firestore_dao.py` (6 dependencies)
-- `app/routes/oauth.py` (5 dependencies)
-- `app/routes/token.py` (5 dependencies)
+- `app/routes/admin.py` (5 dependencies)
 - `app/dependencies/firestore.py` (4 dependencies)
-- `app/routes/admin.py` (4 dependencies)
 - `tests/test_oauth_flow.py` (4 dependencies)
 - `tests/test_token_endpoint.py` (4 dependencies)
-- `app/services/firestore.py` (2 dependencies)
-- `tests/test_health.py` (2 dependencies)
+- `app/services/firestore.py` (3 dependencies)
+- `app/dao/firestore_dao.py` (2 dependencies)

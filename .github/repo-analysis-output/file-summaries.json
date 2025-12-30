@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "total_files": 29,
+  "total_files": 32,
   "files": [
     {
       "schema_version": "2.0",
@@ -53,8 +53,8 @@
       "summary": "Python module for firestore dao",
       "summary_text": "Python module for firestore dao",
       "metrics": {
-        "size_bytes": 23693,
-        "loc": 462,
+        "size_bytes": 23785,
+        "loc": 463,
         "todo_count": 0
       }
     },
@@ -123,8 +123,8 @@
       "summary": "Python module for admin",
       "summary_text": "Python module for admin",
       "metrics": {
-        "size_bytes": 6708,
-        "loc": 161,
+        "size_bytes": 6812,
+        "loc": 162,
         "todo_count": 0
       }
     },
@@ -151,8 +151,8 @@
       "summary": "Python module for oauth",
       "summary_text": "Python module for oauth",
       "metrics": {
-        "size_bytes": 28400,
-        "loc": 687,
+        "size_bytes": 28654,
+        "loc": 688,
         "todo_count": 0
       }
     },
@@ -165,8 +165,8 @@
       "summary": "Python module for token",
       "summary_text": "Python module for token",
       "metrics": {
-        "size_bytes": 17726,
-        "loc": 371,
+        "size_bytes": 18063,
+        "loc": 374,
         "todo_count": 0
       }
     },
@@ -193,8 +193,8 @@
       "summary": "Python module for firestore",
       "summary_text": "Python module for firestore",
       "metrics": {
-        "size_bytes": 4343,
-        "loc": 70,
+        "size_bytes": 4447,
+        "loc": 71,
         "todo_count": 0
       }
     },
@@ -207,8 +207,8 @@
       "summary": "Python module for github",
       "summary_text": "Python module for github",
       "metrics": {
-        "size_bytes": 29845,
-        "loc": 562,
+        "size_bytes": 29837,
+        "loc": 560,
         "todo_count": 0
       }
     },
@@ -235,8 +235,22 @@
       "summary": "Python module for logging",
       "summary_text": "Python module for logging",
       "metrics": {
-        "size_bytes": 4607,
-        "loc": 84,
+        "size_bytes": 4697,
+        "loc": 82,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/utils/security.py",
+      "language": "Python",
+      "role": "implementation",
+      "role_justification": "general implementation file (default classification)",
+      "summary": "Python module for security",
+      "summary_text": "Python module for security",
+      "metrics": {
+        "size_bytes": 11679,
+        "loc": 238,
         "todo_count": 0
       }
     },
@@ -312,6 +326,20 @@
     },
     {
       "schema_version": "2.0",
+      "path": "tests/test_admin_endpoint_security.py",
+      "language": "Python",
+      "role": "test",
+      "role_justification": "filename starts with 'test_'",
+      "summary": "Python test file (role: test)",
+      "summary_text": "Python test file (role: test)",
+      "metrics": {
+        "size_bytes": 5081,
+        "loc": 78,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
       "path": "tests/test_config.py",
       "language": "Python",
       "role": "test",
@@ -333,8 +361,8 @@
       "summary": "Python test file (role: test)",
       "summary_text": "Python test file (role: test)",
       "metrics": {
-        "size_bytes": 57197,
-        "loc": 1050,
+        "size_bytes": 57590,
+        "loc": 1051,
         "todo_count": 0
       }
     },
@@ -363,6 +391,20 @@
       "metrics": {
         "size_bytes": 48362,
         "loc": 897,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "tests/test_security_utils.py",
+      "language": "Python",
+      "role": "test",
+      "role_justification": "filename starts with 'test_'",
+      "summary": "Python test file (role: test)",
+      "summary_text": "Python test file (role: test)",
+      "metrics": {
+        "size_bytes": 20059,
+        "loc": 379,
         "todo_count": 0
       }
     },

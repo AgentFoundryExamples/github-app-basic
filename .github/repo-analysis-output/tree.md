@@ -34,7 +34,8 @@
     └── github.py
   ├── utils
     ├── __init__.py
-    └── logging.py
+    ├── logging.py
+    └── security.py
   ├── __init__.py
   ├── config.py
   └── main.py
@@ -44,10 +45,12 @@
 ├── tests
   ├── __init__.py
   ├── test_admin_cli.py
+  ├── test_admin_endpoint_security.py
   ├── test_config.py
   ├── test_firestore_dao.py
   ├── test_health.py
   ├── test_oauth_flow.py
+  ├── test_security_utils.py
   ├── test_token_endpoint.py
   ├── test_token_refresh.py
   └── test_token_refresh_integration.py
@@ -61,4 +64,5 @@
 ├── pyproject.toml
 ├── README.md
 ├── requirements-dev.txt
-└── requirements.txt
+├── requirements.txt
+└── SECURITY.md

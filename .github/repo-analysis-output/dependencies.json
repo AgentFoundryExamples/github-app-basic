@@ -269,6 +269,22 @@
       }
     },
     {
+      "id": "app/utils/security.py",
+      "path": "app/utils/security.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "re",
+          "typing.Any",
+          "typing.Dict",
+          "typing.List",
+          "typing.Optional",
+          "typing.Union"
+        ],
+        "third-party": []
+      }
+    },
+    {
       "id": "healthcheck.py",
       "path": "healthcheck.py",
       "type": "file",
@@ -346,6 +362,21 @@
         ],
         "third-party": [
           "google.api_core.exceptions",
+          "pytest"
+        ]
+      }
+    },
+    {
+      "id": "tests/test_admin_endpoint_security.py",
+      "path": "tests/test_admin_endpoint_security.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "unittest.mock.AsyncMock",
+          "unittest.mock.Mock",
+          "unittest.mock.patch"
+        ],
+        "third-party": [
           "pytest"
         ]
       }
@@ -431,6 +462,17 @@
       }
     },
     {
+      "id": "tests/test_security_utils.py",
+      "path": "tests/test_security_utils.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [],
+        "third-party": [
+          "pytest"
+        ]
+      }
+    },
+    {
       "id": "tests/test_token_endpoint.py",
       "path": "tests/test_token_endpoint.py",
       "type": "file",
@@ -507,6 +549,10 @@
       "target": "app/utils/logging.py"
     },
     {
+      "source": "app/dao/firestore_dao.py",
+      "target": "app/utils/security.py"
+    },
+    {
       "source": "app/dependencies/firestore.py",
       "target": "app/config.py"
     },
@@ -563,6 +609,10 @@
       "target": "app/utils/logging.py"
     },
     {
+      "source": "app/routes/admin.py",
+      "target": "app/utils/security.py"
+    },
+    {
       "source": "app/routes/oauth.py",
       "target": "app/config.py"
     },
@@ -573,6 +623,10 @@
     {
       "source": "app/routes/oauth.py",
       "target": "app/utils/logging.py"
+    },
+    {
+      "source": "app/routes/oauth.py",
+      "target": "app/utils/security.py"
     },
     {
       "source": "app/routes/oauth.py",
@@ -603,20 +657,40 @@
       "target": "app/utils/logging.py"
     },
     {
+      "source": "app/routes/token.py",
+      "target": "app/utils/security.py"
+    },
+    {
       "source": "app/services/firestore.py",
       "target": "app/config.py"
     },
     {
       "source": "app/services/firestore.py",
       "target": "app/utils/logging.py"
+    },
+    {
+      "source": "app/services/firestore.py",
+      "target": "app/utils/security.py"
     },
     {
       "source": "app/services/github.py",
       "target": "app/utils/logging.py"
     },
     {
+      "source": "app/services/github.py",
+      "target": "app/utils/security.py"
+    },
+    {
+      "source": "app/utils/logging.py",
+      "target": "app/utils/security.py"
+    },
+    {
       "source": "tests/test_admin_cli.py",
       "target": "scripts/show_token_metadata.py"
+    },
+    {
+      "source": "tests/test_admin_endpoint_security.py",
+      "target": "app/dao/firestore_dao.py"
     },
     {
       "source": "tests/test_config.py",
@@ -669,6 +743,10 @@
     {
       "source": "tests/test_oauth_flow.py",
       "target": "app/dependencies/firestore.py"
+    },
+    {
+      "source": "tests/test_security_utils.py",
+      "target": "app/utils/security.py"
     },
     {
       "source": "tests/test_token_endpoint.py",
@@ -724,7 +802,9 @@
       "typing.Any",
       "typing.AsyncIterator",
       "typing.Dict",
+      "typing.List",
       "typing.Optional",
+      "typing.Union",
       "unittest.mock.AsyncMock",
       "unittest.mock.MagicMock",
       "unittest.mock.Mock",
@@ -768,7 +848,7 @@
       "pythonjsonlogger.jsonlogger",
       "uvicorn"
     ],
-    "stdlib_count": 29,
+    "stdlib_count": 31,
     "third-party_count": 35
   }
 }
