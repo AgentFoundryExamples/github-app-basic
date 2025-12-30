@@ -60,6 +60,9 @@ deploy: ## Deploy to Cloud Run (requires PROJECT_ID)
 		--set-env-vars="GITHUB_CLIENT_SECRET=placeholder" \
 		--set-env-vars="GITHUB_WEBHOOK_SECRET=placeholder" \
 		--project $(PROJECT_ID)
+	@echo ""
+	@echo "NOTE: The ^##^ delimiter syntax is used for gcloud to properly parse multiple env vars in one flag."
+	@echo "See: https://cloud.google.com/sdk/gcloud/reference/topic/escaping"
 
 deploy-with-secrets: ## Deploy to Cloud Run with secrets from environment
 	@if [ "$(PROJECT_ID)" = "your-gcp-project-id" ]; then \
@@ -72,6 +75,8 @@ deploy-with-secrets: ## Deploy to Cloud Run with secrets from environment
 		echo "Please source your .env file or export them manually."; \
 		exit 1; \
 	fi
+	# Note: Using separate --set-env-vars flags to avoid exposing secrets in shell history
+	# The ^##^ delimiter allows multiple values in first flag (gcloud escaping syntax)
 	gcloud run deploy $(SERVICE_NAME) \
 		--image $(FULL_IMAGE_NAME) \
 		--platform managed \

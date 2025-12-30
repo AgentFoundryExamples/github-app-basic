@@ -26,7 +26,10 @@ def check_health():
         else:
             print(f"Health check failed with status: {response.status}", file=sys.stderr)
             return 1
-    except Exception as e:
+    except (ConnectionError, OSError, http.client.HTTPException) as e:
+        # ConnectionError: Cannot connect to service
+        # OSError: Network-related errors (including connection refused)
+        # HTTPException: HTTP protocol errors
         print(f"Health check failed: {e}", file=sys.stderr)
         return 1
     finally:
