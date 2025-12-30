@@ -1,0 +1,66 @@
+"""Firestore dependency injection for FastAPI routes.
+
+This module provides dependency injection functions that make Firestore DAO
+accessible to FastAPI routes with proper error handling and HTTP status codes.
+"""
+
+from fastapi import Depends, HTTPException, status, Request
+
+from app.config import Settings
+from app.dao.firestore_dao import FirestoreDAO
+from app.services.firestore import get_firestore_client
+from app.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+def get_settings(request: Request) -> Settings:
+    """Get application settings from FastAPI app state.
+    
+    Args:
+        request: FastAPI request object.
+        
+    Returns:
+        Application settings.
+    """
+    return request.app.state.settings
+
+
+def get_firestore_dao(settings: Settings = Depends(get_settings)) -> FirestoreDAO:
+    """Get Firestore DAO instance for dependency injection.
+    
+    This function is used as a FastAPI dependency to inject FirestoreDAO
+    into route handlers. It handles initialization errors gracefully and
+    converts them to appropriate HTTP errors.
+    
+    Args:
+        settings: Application settings (injected).
+        
+    Returns:
+        Initialized FirestoreDAO instance.
+        
+    Raises:
+        HTTPException: 503 if Firestore client cannot be initialized,
+                      500 for other unexpected errors.
+    """
+    try:
+        client = get_firestore_client(settings)
+        return FirestoreDAO(client)
+        
+    except ValueError as e:
+        # Configuration error (missing GCP_PROJECT_ID, etc.)
+        error_msg = f"Firestore configuration error: {str(e)}"
+        logger.error(error_msg)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=error_msg
+        )
+        
+    except Exception as e:
+        # Unexpected error during client initialization
+        error_msg = f"Failed to initialize Firestore: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Firestore service is temporarily unavailable"
+        )

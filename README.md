@@ -58,7 +58,7 @@ GITHUB_CLIENT_ID=<your-client-id>
 GITHUB_CLIENT_SECRET=<your-client-secret>
 GITHUB_WEBHOOK_SECRET=<your-webhook-secret>
 
-# GCP Configuration (optional for dev)
+# GCP Configuration (required for Firestore)
 GCP_PROJECT_ID=<your-project-id>
 GOOGLE_APPLICATION_CREDENTIALS=<path-to-credentials-json>
 ```
@@ -80,6 +80,83 @@ ENABLE_CORS=false      # Enable CORS middleware (default: false)
 ### Development Defaults
 
 For local development, only `APP_ENV=dev` is needed. All other fields are optional and will use sensible defaults.
+
+### Firestore Configuration
+
+The service includes Firestore integration for data persistence:
+
+#### Local Development Setup
+
+1. **Install Google Cloud SDK** (if not already installed):
+   ```bash
+   # Follow instructions at: https://cloud.google.com/sdk/docs/install
+   ```
+
+2. **Authenticate with your Google Cloud account**:
+   ```bash
+   gcloud auth application-default login
+   ```
+
+3. **Or use a service account key** (alternative to step 2):
+   ```bash
+   # Download service account key from GCP Console
+   export GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
+   ```
+
+4. **Set your GCP project ID**:
+   ```bash
+   export GCP_PROJECT_ID=your-gcp-project-id
+   ```
+
+#### Cloud Run Deployment
+
+In Cloud Run, Firestore authentication uses the default service account automatically. Ensure:
+- The Cloud Run service account has the `roles/datastore.user` or `roles/datastore.owner` IAM role
+- `GCP_PROJECT_ID` environment variable is set in Cloud Run configuration
+
+#### Firestore Usage
+
+The Firestore DAO is available via FastAPI dependency injection:
+
+```python
+from fastapi import APIRouter, Depends
+from app.dao.firestore_dao import FirestoreDAO
+from app.dependencies.firestore import get_firestore_dao
+
+router = APIRouter()
+
+@router.get("/example")
+async def example_endpoint(dao: FirestoreDAO = Depends(get_firestore_dao)):
+    # Get a document
+    doc = await dao.get_document("collection_name", "doc_id")
+    
+    # Set a document
+    await dao.set_document("collection_name", "doc_id", {"key": "value"})
+    
+    return {"status": "ok"}
+```
+
+#### Important Security Notes
+
+⚠️ **DO NOT store real secrets or sensitive user data in Firestore yet**
+- Use placeholder collections only for testing (e.g., `test_collection`, `placeholder_data`)
+- Real token/user data persistence requires additional security measures
+- Always validate and sanitize data before persisting
+
+#### Firestore Emulator (Optional)
+
+For local testing without GCP credentials:
+
+```bash
+# Install Firebase tools
+npm install -g firebase-tools
+
+# Start Firestore emulator
+firebase emulators:start --only firestore
+
+# Set emulator environment variable
+export FIRESTORE_EMULATOR_HOST=localhost:8080
+```
 
 ## Running Locally
 
@@ -156,13 +233,23 @@ github-app-basic/
 │   ├── routes/
 │   │   ├── __init__.py
 │   │   └── health.py        # Health check endpoint
+│   ├── services/
+│   │   ├── __init__.py
+│   │   └── firestore.py     # Firestore client initialization
+│   ├── dao/
+│   │   ├── __init__.py
+│   │   └── firestore_dao.py # Firestore data access layer
+│   ├── dependencies/
+│   │   ├── __init__.py
+│   │   └── firestore.py     # FastAPI dependency injection
 │   └── utils/
 │       ├── __init__.py
 │       └── logging.py       # Structured logging setup
 ├── tests/
 │   ├── __init__.py
 │   ├── test_config.py       # Configuration tests
-│   └── test_health.py       # Health endpoint tests
+│   ├── test_health.py       # Health endpoint tests
+│   └── test_firestore_dao.py # Firestore DAO tests
 ├── requirements.txt         # Production dependencies
 ├── requirements-dev.txt     # Development dependencies
 ├── pyproject.toml           # pytest configuration
