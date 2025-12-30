@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Union, Optional
 
 # Patterns that indicate sensitive data
 SENSITIVE_PATTERNS = [
-    r'gh[pousr]_[A-Za-z0-9_-]{4,}',  # GitHub tokens (gho_, ghp_, ghs_, ghu_, ghr_) - at least 4 chars after prefix
+    r'gh[pousr]_[A-Za-z0-9_-]{4,}',  # GitHub tokens (ghp_, gho_, ghs_, ghu_) - at least 4 chars after prefix
     r'[A-Za-z0-9]{40}',  # Generic 40-character tokens (like GitHub classic tokens)
     r'-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----',  # PEM keys
     r'(?:password|passwd|pwd|secret|api[_-]?key|token|auth)["\s:=]+[A-Za-z0-9+/=]{8,}',  # Key-value pairs
