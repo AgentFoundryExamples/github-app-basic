@@ -1377,6 +1377,18 @@ class TestSerializationHelpers:
                 threshold_minutes=30
             )
     
+    def test_is_token_near_expiry_naive_current_time_raises_error(self):
+        """Test that naive current_time parameter raises ValueError."""
+        expires_at = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        naive_current_time = datetime(2025, 12, 31, 22, 0, 0)  # No timezone
+        
+        with pytest.raises(ValueError, match="current_time must be timezone-aware"):
+            FirestoreDAO.is_token_near_expiry(
+                expires_at=expires_at,
+                threshold_minutes=30,
+                current_time=naive_current_time
+            )
+    
     def test_is_token_expired_true(self):
         """Test token is expired when current time >= expiry."""
         current_time = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
@@ -1426,3 +1438,14 @@ class TestSerializationHelpers:
         
         with pytest.raises(ValueError, match="must be timezone-aware"):
             FirestoreDAO.is_token_expired(expires_at=naive_datetime)
+    
+    def test_is_token_expired_naive_current_time_raises_error(self):
+        """Test that naive current_time parameter raises ValueError."""
+        expires_at = datetime(2025, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+        naive_current_time = datetime(2025, 12, 31, 22, 0, 0)  # No timezone
+        
+        with pytest.raises(ValueError, match="current_time must be timezone-aware"):
+            FirestoreDAO.is_token_expired(
+                expires_at=expires_at,
+                current_time=naive_current_time
+            )

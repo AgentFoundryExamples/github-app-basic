@@ -544,12 +544,13 @@ class FirestoreDAO:
             expires_at: Token expiration datetime (must be timezone-aware if provided).
             threshold_minutes: Minutes before expiry to consider token near-expiry.
             current_time: Optional current time for testing. Defaults to datetime.now(timezone.utc).
+                         Must be timezone-aware if provided.
             
         Returns:
             True if token is near expiry, False if not near expiry or non-expiring.
             
         Raises:
-            ValueError: If expires_at is provided but not timezone-aware.
+            ValueError: If expires_at or current_time is provided but not timezone-aware.
         """
         # Non-expiring tokens (missing expires_at) are never near expiry
         if expires_at is None:
@@ -559,12 +560,12 @@ class FirestoreDAO:
         if expires_at.tzinfo is None:
             raise ValueError("expires_at must be timezone-aware")
         
+        # Validate current_time is timezone-aware if provided
+        if current_time is not None and current_time.tzinfo is None:
+            raise ValueError("current_time must be timezone-aware")
+        
         # Get current time
         now = current_time if current_time is not None else datetime.now(timezone.utc)
-        
-        # Validate current_time is timezone-aware
-        if now.tzinfo is None:
-            raise ValueError("current_time must be timezone-aware")
         
         # Calculate time until expiry
         time_until_expiry = expires_at - now
@@ -585,12 +586,13 @@ class FirestoreDAO:
         Args:
             expires_at: Token expiration datetime (must be timezone-aware if provided).
             current_time: Optional current time for testing. Defaults to datetime.now(timezone.utc).
+                         Must be timezone-aware if provided.
             
         Returns:
             True if token is expired, False if not expired or non-expiring.
             
         Raises:
-            ValueError: If expires_at is provided but not timezone-aware.
+            ValueError: If expires_at or current_time is provided but not timezone-aware.
         """
         # Non-expiring tokens (missing expires_at) never expire
         if expires_at is None:
@@ -600,12 +602,12 @@ class FirestoreDAO:
         if expires_at.tzinfo is None:
             raise ValueError("expires_at must be timezone-aware")
         
+        # Validate current_time is timezone-aware if provided
+        if current_time is not None and current_time.tzinfo is None:
+            raise ValueError("current_time must be timezone-aware")
+        
         # Get current time
         now = current_time if current_time is not None else datetime.now(timezone.utc)
-        
-        # Validate current_time is timezone-aware
-        if now.tzinfo is None:
-            raise ValueError("current_time must be timezone-aware")
         
         # Token is expired if current time >= expiry time
         return now >= expires_at
