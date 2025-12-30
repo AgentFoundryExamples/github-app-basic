@@ -114,6 +114,22 @@
       }
     },
     {
+      "id": "app/routes/admin.py",
+      "path": "app/routes/admin.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "typing.Optional"
+        ],
+        "third-party": [
+          "fastapi.APIRouter",
+          "fastapi.Depends",
+          "fastapi.HTTPException",
+          "fastapi.Request"
+        ]
+      }
+    },
+    {
       "id": "app/routes/health.py",
       "path": "app/routes/health.py",
       "type": "file",
@@ -259,12 +275,53 @@
       }
     },
     {
+      "id": "scripts/show_token_metadata.py",
+      "path": "scripts/show_token_metadata.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "argparse",
+          "asyncio",
+          "json",
+          "os",
+          "pathlib.Path",
+          "sys",
+          "traceback",
+          "typing.Optional"
+        ],
+        "third-party": [
+          "google.api_core.exceptions",
+          "google.cloud.firestore"
+        ]
+      }
+    },
+    {
       "id": "tests/__init__.py",
       "path": "tests/__init__.py",
       "type": "file",
       "external_dependencies": {
         "stdlib": [],
         "third-party": []
+      }
+    },
+    {
+      "id": "tests/test_admin_cli.py",
+      "path": "tests/test_admin_cli.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "json",
+          "os",
+          "pathlib.Path",
+          "sys",
+          "unittest.mock.AsyncMock",
+          "unittest.mock.Mock",
+          "unittest.mock.patch"
+        ],
+        "third-party": [
+          "google.api_core.exceptions",
+          "pytest"
+        ]
       }
     },
     {
@@ -386,6 +443,26 @@
       "target": "app/routes/oauth.py"
     },
     {
+      "source": "app/main.py",
+      "target": "app/routes/admin.py"
+    },
+    {
+      "source": "app/routes/admin.py",
+      "target": "app/config.py"
+    },
+    {
+      "source": "app/routes/admin.py",
+      "target": "app/dao/firestore_dao.py"
+    },
+    {
+      "source": "app/routes/admin.py",
+      "target": "app/dependencies/firestore.py"
+    },
+    {
+      "source": "app/routes/admin.py",
+      "target": "app/utils/logging.py"
+    },
+    {
       "source": "app/routes/oauth.py",
       "target": "app/config.py"
     },
@@ -416,6 +493,10 @@
     {
       "source": "app/services/github.py",
       "target": "app/utils/logging.py"
+    },
+    {
+      "source": "tests/test_admin_cli.py",
+      "target": "scripts/show_token_metadata.py"
     },
     {
       "source": "tests/test_config.py",
@@ -481,8 +562,10 @@
       "datetime.timedelta",
       "datetime.timezone",
       "http.client",
+      "json",
       "logging",
       "os",
+      "pathlib.Path",
       "re",
       "secrets",
       "sys",
@@ -534,7 +617,7 @@
       "pythonjsonlogger.jsonlogger",
       "uvicorn"
     ],
-    "stdlib_count": 27,
+    "stdlib_count": 29,
     "third-party_count": 32
   }
 }

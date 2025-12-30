@@ -8,16 +8,16 @@ Includes classification of external dependencies as stdlib vs third-party.
 
 ## Statistics
 
-- **Total files**: 22
-- **Intra-repo dependencies**: 30
-- **External stdlib dependencies**: 27
+- **Total files**: 25
+- **Intra-repo dependencies**: 36
+- **External stdlib dependencies**: 29
 - **External third-party dependencies**: 32
 
 ## External Dependencies
 
 ### Standard Library / Core Modules
 
-Total: 27 unique modules
+Total: 29 unique modules
 
 - `argparse`
 - `asyncio`
@@ -28,8 +28,10 @@ Total: 27 unique modules
 - `datetime.timedelta`
 - `datetime.timezone`
 - `http.client`
+- `json`
 - `logging`
 - `os`
+- `pathlib.Path`
 - `re`
 - `secrets`
 - `sys`
@@ -37,9 +39,7 @@ Total: 27 unique modules
 - `threading.Lock`
 - `time`
 - `traceback`
-- `typing.Any`
-- `typing.AsyncIterator`
-- ... and 7 more (see JSON for full list)
+- ... and 9 more (see JSON for full list)
 
 ### Third-Party Packages
 
@@ -69,25 +69,26 @@ Total: 32 unique packages
 
 ## Most Depended Upon Files (Intra-Repo)
 
-- `app/config.py` (8 dependents)
-- `app/utils/logging.py` (7 dependents)
-- `app/dao/firestore_dao.py` (3 dependents)
-- `app/dependencies/firestore.py` (3 dependents)
+- `app/config.py` (9 dependents)
+- `app/utils/logging.py` (8 dependents)
+- `app/dao/firestore_dao.py` (4 dependents)
+- `app/dependencies/firestore.py` (4 dependents)
 - `app/main.py` (3 dependents)
 - `app/services/firestore.py` (2 dependents)
 - `app/services/github.py` (2 dependents)
 - `app/routes/health.py` (1 dependents)
 - `app/routes/oauth.py` (1 dependents)
+- `app/routes/admin.py` (1 dependents)
 
 ## Files with Most Dependencies (Intra-Repo)
 
 - `tests/test_firestore_dao.py` (6 dependencies)
+- `app/main.py` (5 dependencies)
 - `app/routes/oauth.py` (5 dependencies)
 - `app/dependencies/firestore.py` (4 dependencies)
-- `app/main.py` (4 dependencies)
+- `app/routes/admin.py` (4 dependencies)
 - `tests/test_oauth_flow.py` (4 dependencies)
 - `app/services/firestore.py` (2 dependencies)
 - `tests/test_health.py` (2 dependencies)
 - `app/dao/firestore_dao.py` (1 dependencies)
 - `app/services/github.py` (1 dependencies)
-- `tests/test_config.py` (1 dependencies)

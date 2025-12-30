@@ -24,6 +24,7 @@
     └── firestore.py
   ├── routes
     ├── __init__.py
+    ├── admin.py
     ├── health.py
     └── oauth.py
   ├── services
@@ -37,9 +38,11 @@
   ├── config.py
   └── main.py
 ├── scripts
-  └── reset_github_token.py
+  ├── reset_github_token.py
+  └── show_token_metadata.py
 ├── tests
   ├── __init__.py
+  ├── test_admin_cli.py
   ├── test_config.py
   ├── test_firestore_dao.py
   ├── test_health.py
