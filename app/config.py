@@ -113,13 +113,6 @@ class Settings(BaseSettings):
                 "Ensure the key is properly formatted and includes the BEGIN/END markers."
             )
         
-        # Check for both BEGIN and END markers
-        if '-----BEGIN' not in v or '-----END' not in v:
-            raise ValueError(
-                "GITHUB_APP_PRIVATE_KEY_PEM must contain both BEGIN and END markers. "
-                "Ensure the complete PEM key is provided."
-            )
-        
         return v
     
     def validate_production_settings(self) -> None:

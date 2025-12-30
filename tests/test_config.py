@@ -14,7 +14,6 @@
 """Tests for configuration management."""
 
 import pytest
-import logging
 
 from app.config import Settings
 
@@ -84,6 +83,8 @@ class TestSettings:
     
     def test_production_validation_logs_warning_for_missing_webhook_secret(self, monkeypatch, caplog):
         """Test that missing webhook secret logs a warning but doesn't fail."""
+        import logging
+        
         monkeypatch.setenv("APP_ENV", "prod")
         monkeypatch.setenv("GITHUB_APP_ID", "123456")
         monkeypatch.setenv("GITHUB_APP_PRIVATE_KEY_PEM", "-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----")
@@ -152,14 +153,6 @@ MIIEpAIBAAKCAQEA1234
         monkeypatch.setenv("GITHUB_APP_PRIVATE_KEY_PEM", pem_key)
         
         with pytest.raises(ValueError, match="must end with a PEM footer"):
-            Settings(_env_file=None)
-    
-    def test_pem_key_incomplete_structure_raises_error(self, monkeypatch):
-        """Test that PEM key with incomplete structure raises validation error."""
-        pem_key = "-----BEGIN RSA PRIVATE KEY-----"
-        monkeypatch.setenv("GITHUB_APP_PRIVATE_KEY_PEM", pem_key)
-        
-        with pytest.raises(ValueError, match="must contain both BEGIN and END markers"):
             Settings(_env_file=None)
     
     def test_pem_key_empty_after_strip_becomes_none(self, monkeypatch):
