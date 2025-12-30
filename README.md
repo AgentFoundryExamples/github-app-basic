@@ -1409,6 +1409,7 @@ When calling from one Cloud Run service to another, use Google's authentication 
 ```python
 import google.auth
 import google.auth.transport.requests
+import google.oauth2.id_token
 import requests
 import json
 
@@ -1429,15 +1430,21 @@ def get_github_token(force_refresh: bool = False) -> dict:
         requests.HTTPError: If request fails (404, 500, 503)
     """
     # Obtain identity token for service-to-service auth
-    auth_req = google.auth.transport.requests.Request()
-    credentials, project = google.auth.default()
+    # For service accounts in Cloud Run/Cloud Functions, we need to explicitly
+    # request an identity token with the target service URL as the audience
+    import google.auth.transport.requests
+    import google.oauth2.id_token
     
-    # Refresh credentials to get identity token with correct audience
-    credentials.refresh(auth_req)
-    
-    # Get identity token targeting the service URL
-    # Note: For service accounts, use the service URL as audience
-    id_token = credentials.id_token
+    try:
+        # For service accounts: fetch identity token with target audience
+        auth_req = google.auth.transport.requests.Request()
+        id_token = google.oauth2.id_token.fetch_id_token(auth_req, SERVICE_URL)
+    except Exception:
+        # Fallback for user accounts or local development
+        # This uses Application Default Credentials (ADC)
+        credentials, project = google.auth.default()
+        credentials.refresh(auth_req)
+        id_token = credentials.id_token
     
     # Make authenticated request to token endpoint
     headers = {
@@ -1511,9 +1518,16 @@ async function getGitHubToken(forceRefresh = false) {
   // Create GoogleAuth client
   const auth = new GoogleAuth();
   
-  // Get identity token for the target service
+  // Get identity token client for the target service
+  // The client is automatically configured with SERVICE_URL as the audience
   const client = await auth.getIdTokenClient(SERVICE_URL);
+  
+  // Get the identity token from the configured client
   const idToken = await client.idTokenProvider.fetchIdToken(SERVICE_URL);
+  
+  // Alternative simpler approach (recommended):
+  // const headers = await client.getRequestHeaders();
+  // const idToken = headers['Authorization'].replace('Bearer ', '');
   
   // Call token endpoint
   const response = await axios.post(
