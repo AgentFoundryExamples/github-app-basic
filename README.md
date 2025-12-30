@@ -13,6 +13,7 @@ FastAPI-based service for minting GitHub App tokens with GCP integration, design
 - 🌐 Optional CORS middleware (disabled by default)
 - 🔐 OAuth token persistence with AES-256-GCM encryption in Firestore
 - 🛡️ Secure token storage with automated timestamp normalization (UTC ISO-8601)
+- 🔄 Token refresh workflows with cooldown enforcement and retry logic
 
 ## Prerequisites
 
@@ -169,6 +170,28 @@ GITHUB_WEBHOOK_SECRET=<your-webhook-secret>  # For webhook signature verificatio
 # Token Storage (optional, defaults provided)
 GITHUB_TOKENS_COLLECTION=github_tokens  # Firestore collection name for tokens
 GITHUB_TOKENS_DOC_ID=primary_user       # Document ID for the primary token
+
+# Token Refresh Configuration (optional, defaults provided)
+TOKEN_REFRESH_THRESHOLD_MINUTES=30      # Minutes before expiry to refresh token (default: 30)
+TOKEN_REFRESH_COOLDOWN_SECONDS=300      # Cooldown between refresh attempts (default: 300 = 5 min)
+```
+
+### Token Refresh Workflows
+
+The service includes automatic token refresh capabilities with intelligent cooldown enforcement:
+
+- **Refresh Method**: Uses OAuth `refresh_token` grant when available, falls back to reissue via GitHub App
+- **Cooldown Enforcement**: Prevents excessive API calls by enforcing a configurable cooldown period between failed refresh attempts
+- **Retry Logic**: Automatically retries transient errors (500, network issues) with exponential backoff
+- **Error Handling**: Properly handles permanent failures (401, 422) without retry
+- **Metadata Persistence**: Tracks refresh attempts, status, and errors in Firestore for observability
+
+**Configuration Options:**
+- `TOKEN_REFRESH_THRESHOLD_MINUTES`: How many minutes before token expiry to consider it "near-expiry" (default: 30)
+- `TOKEN_REFRESH_COOLDOWN_SECONDS`: Minimum seconds between refresh attempts after failures (default: 300)
+
+**Force Refresh:**
+Token refresh can bypass cooldown when explicitly requested with `force_refresh=True`, useful for administrative operations.
 ```
 
 ### Development Defaults
