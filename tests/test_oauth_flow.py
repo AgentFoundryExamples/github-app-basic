@@ -1092,8 +1092,11 @@ class TestAdminTokenMetadataEndpoint:
         
         client = TestClient(app)
         
-        # Return both client and mock_dao for setting expectations
-        return client, mock_dao, app
+        # Yield instead of return to ensure cleanup
+        yield client, mock_dao, app
+        
+        # Cleanup will always run even if test fails
+        app.dependency_overrides.clear()
     
     def test_get_token_metadata_success(self, client_with_mock_dao):
         """Test successful metadata retrieval."""
@@ -1107,27 +1110,24 @@ class TestAdminTokenMetadataEndpoint:
             "updated_at": "2025-12-30T12:00:00+00:00"
         })
         
-        try:
-            response = client.get("/admin/token-metadata")
-            
-            assert response.status_code == 200
-            data = response.json()
-            
-            # Verify metadata fields are present
-            assert data["token_type"] == "bearer"
-            assert data["scope"] == "repo,user:email,read:org"
-            assert data["expires_at"] == "2025-12-31T23:59:59+00:00"
-            assert data["has_refresh_token"] is True
-            assert data["updated_at"] == "2025-12-30T12:00:00+00:00"
-            
-            # Verify sensitive fields are NOT present
-            assert "access_token" not in data
-            assert "refresh_token" not in data
-            
-            # Verify DAO was called correctly
-            mock_dao.get_github_token_metadata.assert_called_once()
-        finally:
-            app.dependency_overrides.clear()
+        response = client.get("/admin/token-metadata")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify metadata fields are present
+        assert data["token_type"] == "bearer"
+        assert data["scope"] == "repo,user:email,read:org"
+        assert data["expires_at"] == "2025-12-31T23:59:59+00:00"
+        assert data["has_refresh_token"] is True
+        assert data["updated_at"] == "2025-12-30T12:00:00+00:00"
+        
+        # Verify sensitive fields are NOT present
+        assert "access_token" not in data
+        assert "refresh_token" not in data
+        
+        # Verify DAO was called correctly
+        mock_dao.get_github_token_metadata.assert_called_once()
     
     def test_get_token_metadata_not_found(self, client_with_mock_dao):
         """Test metadata retrieval when document doesn't exist."""
@@ -1135,14 +1135,11 @@ class TestAdminTokenMetadataEndpoint:
         
         mock_dao.get_github_token_metadata = AsyncMock(return_value=None)
         
-        try:
-            response = client.get("/admin/token-metadata")
-            
-            assert response.status_code == 404
-            data = response.json()
-            assert "not found" in data["detail"].lower()
-        finally:
-            app.dependency_overrides.clear()
+        response = client.get("/admin/token-metadata")
+        
+        assert response.status_code == 404
+        data = response.json()
+        assert "not found" in data["detail"].lower()
     
     def test_get_token_metadata_permission_error(self, client_with_mock_dao):
         """Test metadata retrieval with permission denied."""
@@ -1152,14 +1149,11 @@ class TestAdminTokenMetadataEndpoint:
             side_effect=PermissionError("Access denied")
         )
         
-        try:
-            response = client.get("/admin/token-metadata")
-            
-            assert response.status_code == 500
-            data = response.json()
-            assert "permission" in data["detail"].lower() or "iam" in data["detail"].lower()
-        finally:
-            app.dependency_overrides.clear()
+        response = client.get("/admin/token-metadata")
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert "permission" in data["detail"].lower() or "iam" in data["detail"].lower()
     
     def test_get_token_metadata_firestore_error(self, client_with_mock_dao):
         """Test metadata retrieval with Firestore error."""
@@ -1169,14 +1163,11 @@ class TestAdminTokenMetadataEndpoint:
             side_effect=Exception("Firestore unavailable")
         )
         
-        try:
-            response = client.get("/admin/token-metadata")
-            
-            assert response.status_code == 500
-            data = response.json()
-            assert "failed" in data["detail"].lower()
-        finally:
-            app.dependency_overrides.clear()
+        response = client.get("/admin/token-metadata")
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert "failed" in data["detail"].lower()
     
     def test_metadata_never_exposes_tokens(self, client_with_mock_dao):
         """Test that metadata endpoint never returns access tokens."""
@@ -1191,21 +1182,18 @@ class TestAdminTokenMetadataEndpoint:
             "updated_at": "2025-12-30T12:00:00+00:00"
         })
         
-        try:
-            response = client.get("/admin/token-metadata")
-            
-            assert response.status_code == 200
-            data = response.json()
-            
-            # Verify no token fields are exposed
-            assert "access_token" not in data
-            assert "refresh_token" not in data
-            
-            # Verify only metadata fields
-            expected_keys = {"token_type", "scope", "expires_at", "has_refresh_token", "updated_at"}
-            assert set(data.keys()) == expected_keys
-        finally:
-            app.dependency_overrides.clear()
+        response = client.get("/admin/token-metadata")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify no token fields are exposed
+        assert "access_token" not in data
+        assert "refresh_token" not in data
+        
+        # Verify only metadata fields
+        expected_keys = {"token_type", "scope", "expires_at", "has_refresh_token", "updated_at"}
+        assert set(data.keys()) == expected_keys
     
     def test_metadata_with_null_scope(self, client_with_mock_dao):
         """Test metadata endpoint handles null scope gracefully."""
@@ -1219,14 +1207,11 @@ class TestAdminTokenMetadataEndpoint:
             "updated_at": "2025-12-30T12:00:00+00:00"
         })
         
-        try:
-            response = client.get("/admin/token-metadata")
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert data["scope"] is None
-        finally:
-            app.dependency_overrides.clear()
+        response = client.get("/admin/token-metadata")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["scope"] is None
     
     def test_metadata_with_large_scope_string(self, client_with_mock_dao):
         """Test metadata endpoint handles large scope strings."""
@@ -1245,13 +1230,10 @@ class TestAdminTokenMetadataEndpoint:
             "updated_at": "2025-12-30T12:00:00+00:00"
         })
         
-        try:
-            response = client.get("/admin/token-metadata")
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert data["scope"] == large_scope
-            assert len(data["scope"]) >= expected_min_length
-        finally:
-            app.dependency_overrides.clear()
+        response = client.get("/admin/token-metadata")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["scope"] == large_scope
+        assert len(data["scope"]) >= expected_min_length
 

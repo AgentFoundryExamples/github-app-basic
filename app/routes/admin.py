@@ -37,7 +37,9 @@ router = APIRouter()
 Get non-sensitive metadata about the stored GitHub OAuth token.
 
 **Security:**
-- This endpoint is IAM-restricted via Cloud Run authentication
+- IAM authentication is enforced at the Cloud Run infrastructure level, not in application code
+- This endpoint has no application-level authentication - it relies entirely on Cloud Run IAM
+- Configure Cloud Run to require authentication: `gcloud run deploy --no-allow-unauthenticated`
 - Never returns the actual access token or encrypted ciphertext
 - Only returns metadata: scope, token_type, expires_at, updated_at
 
@@ -57,8 +59,8 @@ Get non-sensitive metadata about the stored GitHub OAuth token.
 - 500: Firestore access error or other internal error
 - 503: Firestore service unavailable
 
-**Note:** This endpoint relies on Cloud Run IAM for authentication.
-Requests without valid credentials will be rejected at the Cloud Run level.
+**Important:** Authentication must be configured at the Cloud Run deployment level.
+Without Cloud Run IAM configuration, this endpoint would be publicly accessible.
     """,
     responses={
         200: {

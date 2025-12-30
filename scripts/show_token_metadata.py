@@ -31,16 +31,15 @@ Exit Codes:
     1: Error (configuration, permissions, or document not found)
 """
 
-import sys
 import os
 import argparse
 import asyncio
 from typing import Optional
 import json
-
-# Add parent directory to path to import app modules
 import sys
 from pathlib import Path
+
+# Add parent directory to path to import app modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from google.cloud import firestore
