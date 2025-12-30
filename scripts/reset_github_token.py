@@ -135,43 +135,42 @@ async def main() -> int:
         return 1
     
     try:
-        # Initialize Firestore client
-        client = firestore.AsyncClient(project=project_id)
-        
-        if not args.quiet:
-            print(f"Connecting to Firestore project: {project_id}")
-            print(f"Collection: {args.collection}")
-            print(f"Document ID: {args.doc_id}")
-            print()
-        
-        # Check if token exists
-        exists = await check_token_exists(client, args.collection, args.doc_id)
-        
-        if not exists:
+        # Initialize Firestore client using an async context manager
+        async with firestore.AsyncClient(project=project_id) as client:
             if not args.quiet:
-                print(f"✓ Token document does not exist (already deleted or never created)")
+                print(f"Connecting to Firestore project: {project_id}")
+                print(f"Collection: {args.collection}")
+                print(f"Document ID: {args.doc_id}")
+                print()
+            
+            # Check if token exists
+            exists = await check_token_exists(client, args.collection, args.doc_id)
+            
+            if not exists:
+                if not args.quiet:
+                    print(f"✓ Token document does not exist (already deleted or never created)")
+                    print(f"  Path: {args.collection}/{args.doc_id}")
+                return 0
+            
+            if not args.quiet:
+                print(f"✓ Token document found")
                 print(f"  Path: {args.collection}/{args.doc_id}")
-            return 0
-        
-        if not args.quiet:
-            print(f"✓ Token document found")
-            print(f"  Path: {args.collection}/{args.doc_id}")
-        
-        if args.dry_run:
+            
+            if args.dry_run:
+                if not args.quiet:
+                    print()
+                    print("Dry-run mode: Document would be deleted")
+                return 0
+            
+            # Delete the token
+            await delete_token(client, args.collection, args.doc_id)
+            
             if not args.quiet:
                 print()
-                print("Dry-run mode: Document would be deleted")
+                print(f"✓ Token document deleted successfully")
+                print(f"  Path: {args.collection}/{args.doc_id}")
+            
             return 0
-        
-        # Delete the token
-        await delete_token(client, args.collection, args.doc_id)
-        
-        if not args.quiet:
-            print()
-            print(f"✓ Token document deleted successfully")
-            print(f"  Path: {args.collection}/{args.doc_id}")
-        
-        return 0
         
     except gcp_exceptions.PermissionDenied as e:
         print(f"ERROR: Permission denied accessing Firestore", file=sys.stderr)

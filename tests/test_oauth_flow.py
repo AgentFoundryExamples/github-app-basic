@@ -393,7 +393,10 @@ class TestOAuthEndpoints:
         mock_dao.save_github_token = AsyncMock()
         app.dependency_overrides[get_firestore_dao] = lambda: mock_dao
         
-        return TestClient(app)
+        yield TestClient(app)
+        
+        # Cleanup: clear dependency overrides to prevent test pollution
+        app.dependency_overrides.clear()
     
     def test_github_install_redirect(self, client):
         """Test /github/install redirects to GitHub with state."""

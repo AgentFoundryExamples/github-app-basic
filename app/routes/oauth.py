@@ -518,13 +518,54 @@ async def oauth_callback(
                     "doc_id": settings.github_tokens_doc_id
                 }}
             )
+        except PermissionError as e:
+            # Firestore permission denied - IAM configuration issue
+            logger.error(
+                "Permission denied writing to Firestore",
+                extra={"extra_fields": {
+                    "correlation_id": correlation_id,
+                    "error": str(e)
+                }},
+                exc_info=True
+            )
+            
+            return HTMLResponse(
+                content=_render_error_page(
+                    title="Token Storage Failed",
+                    message="Permission denied accessing token storage",
+                    details="The service does not have permission to store tokens. "
+                           "Please contact an administrator to check IAM roles."
+                ),
+                status_code=503
+            )
+        except ValueError as e:
+            # Invalid data or missing encryption key
+            logger.error(
+                "Invalid data for token persistence",
+                extra={"extra_fields": {
+                    "correlation_id": correlation_id,
+                    "error": str(e)
+                }},
+                exc_info=True
+            )
+            
+            return HTMLResponse(
+                content=_render_error_page(
+                    title="Token Storage Failed",
+                    message="Failed to persist GitHub token",
+                    details="Token storage is not properly configured. "
+                           "Please contact an administrator."
+                ),
+                status_code=503
+            )
         except Exception as e:
-            # Firestore persistence failure - this is a critical error
+            # Other Firestore errors (network, quota, etc.)
             logger.error(
                 "Failed to persist GitHub token to Firestore",
                 extra={"extra_fields": {
                     "correlation_id": correlation_id,
-                    "error": str(e)
+                    "error": str(e),
+                    "error_type": type(e).__name__
                 }},
                 exc_info=True
             )
