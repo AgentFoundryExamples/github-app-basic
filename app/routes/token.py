@@ -18,7 +18,7 @@ Provides:
 """
 
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from pydantic import BaseModel, Field
@@ -287,7 +287,6 @@ async def get_token(
                 new_expires_at = None
                 if "expires_in" in refreshed_token_data:
                     new_expires_at = datetime.now(timezone.utc)
-                    from datetime import timedelta
                     new_expires_at += timedelta(seconds=refreshed_token_data["expires_in"])
                 
                 # Persist refreshed token
