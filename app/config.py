@@ -96,6 +96,16 @@ class Settings(BaseSettings):
         description="Enable Prometheus metrics endpoint (disabled by default)"
     )
     
+    # Health Check Configuration
+    health_check_timeout_seconds: int = Field(
+        default=5,
+        description="Timeout in seconds for health check operations (Firestore connectivity test)"
+    )
+    health_check_cache_ttl_seconds: int = Field(
+        default=30,
+        description="Time-to-live in seconds for cached health check results to reduce Firestore load"
+    )
+    
     @field_validator("app_env")
     @classmethod
     def validate_app_env(cls, v: str) -> str:
@@ -178,6 +188,34 @@ class Settings(BaseSettings):
                 f"TOKEN_REFRESH_COOLDOWN_SECONDS must be a positive integer, got {v}. "
                 "This value determines the minimum seconds to wait between token refresh attempts "
                 "to prevent excessive API calls."
+            )
+        return v
+    
+    @field_validator("health_check_timeout_seconds")
+    @classmethod
+    def validate_health_check_timeout_seconds(cls, v: int) -> int:
+        """Validate health check timeout is a positive integer.
+        
+        Raises:
+            ValueError: If the value is not positive.
+        """
+        if v <= 0:
+            raise ValueError(
+                f"HEALTH_CHECK_TIMEOUT_SECONDS must be a positive integer, got {v}."
+            )
+        return v
+    
+    @field_validator("health_check_cache_ttl_seconds")
+    @classmethod
+    def validate_health_check_cache_ttl_seconds(cls, v: int) -> int:
+        """Validate health check cache TTL is a non-negative integer.
+        
+        Raises:
+            ValueError: If the value is negative.
+        """
+        if v < 0:
+            raise ValueError(
+                f"HEALTH_CHECK_CACHE_TTL_SECONDS must be a non-negative integer, got {v}."
             )
         return v
     

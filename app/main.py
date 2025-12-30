@@ -42,6 +42,8 @@ from app.utils.metrics import (
     METRIC_HTTP_REQUESTS_TOTAL
 )
 from app.routes import health, oauth, admin, token
+from app.services.readiness import get_readiness_state
+from app.services.firestore import get_firestore_client
 
 
 @asynccontextmanager
@@ -74,6 +76,40 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_metrics(enabled=settings.enable_metrics)
     if settings.enable_metrics:
         logger.info("Metrics collection enabled - /metrics endpoint available")
+    
+    # Initialize readiness state
+    readiness_state = get_readiness_state()
+    logger.info("Readiness state initialized")
+    
+    # Attempt to initialize Firestore and GitHub config during startup
+    # This allows readiness checks to reflect actual initialization state
+    try:
+        if settings.gcp_project_id:
+            # Try to initialize Firestore client
+            get_firestore_client(settings)
+            readiness_state.mark_component_ready("firestore")
+            logger.info("Firestore client initialized successfully during startup")
+        else:
+            logger.warning("GCP_PROJECT_ID not configured - Firestore not initialized")
+    except Exception as e:
+        logger.warning(
+            f"Firestore initialization failed during startup: {str(e)}. "
+            "Will be checked again during health checks."
+        )
+    
+    # Check GitHub config
+    try:
+        if settings.github_app_id and settings.github_app_private_key_pem:
+            # Basic validation
+            if settings.github_app_private_key_pem.startswith('-----BEGIN'):
+                readiness_state.mark_component_ready("github_config")
+                logger.info("GitHub App configuration validated during startup")
+            else:
+                logger.warning("GitHub App private key format appears invalid")
+        else:
+            logger.warning("GitHub App configuration incomplete - not initialized")
+    except Exception as e:
+        logger.warning(f"GitHub config validation failed during startup: {str(e)}")
     
     yield
     
@@ -171,8 +207,8 @@ The bearer token referenced is a GCP identity token, not the GitHub access token
         
         # Apply security scheme to all endpoints except health check
         for path, path_item in openapi_schema.get("paths", {}).items():
-            if path == "/healthz":
-                continue  # Health check is publicly accessible
+            if path in ["/healthz", "/readyz"]:
+                continue  # Health and readiness checks are publicly accessible
             for operation in path_item.values():
                 if isinstance(operation, dict) and "operationId" in operation:
                     operation["security"] = [{"CloudRunIAM": []}]
