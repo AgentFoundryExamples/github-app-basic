@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Union, Optional
 
 # Patterns that indicate sensitive data
 SENSITIVE_PATTERNS = [
-    r'gh[pousr]_[A-Za-z0-9]{36,}',  # GitHub tokens (gho_, ghp_, ghs_, ghu_, ghr_)
+    r'gh[pousr]_[A-Za-z0-9_-]{4,}',  # GitHub tokens (gho_, ghp_, ghs_, ghu_, ghr_) - at least 4 chars after prefix
     r'[A-Za-z0-9]{40}',  # Generic 40-character tokens (like GitHub classic tokens)
     r'-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----',  # PEM keys
     r'(?:password|passwd|pwd|secret|api[_-]?key|token|auth)["\s:=]+[A-Za-z0-9+/=]{8,}',  # Key-value pairs
@@ -93,6 +93,14 @@ def redact_token(
     if token_len <= max(prefix_len, suffix_len):
         visible = min(token_len - 1, 4) if token_len > 1 else 0
         return token_str[:visible] + mask_char
+    
+    # If suffix_len is 0, don't show suffix
+    if suffix_len == 0:
+        if token_len <= prefix_len:
+            return token_str[:prefix_len] + (mask_char * 3)
+        masked_len = token_len - prefix_len
+        middle = "." * 3 if masked_len < 10 else f".{masked_len}."
+        return f"{token_str[:prefix_len]}{middle}"
     
     # Standard case: show prefix and suffix
     if token_len <= prefix_len + suffix_len:
@@ -169,6 +177,11 @@ def redact_dict(
             name.replace('_', '').replace('-', '') for name in SENSITIVE_FIELD_NAMES
         }:
             result[key] = "[REDACTED]"
+            continue
+        
+        # Skip None values - they're not sensitive
+        if value is None:
+            result[key] = None
             continue
         
         # Recursively handle nested structures
