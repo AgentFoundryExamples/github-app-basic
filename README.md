@@ -363,10 +363,22 @@ To rotate the encryption key, you must re-encrypt all stored tokens with the new
 - **Best Practice:** Every 30 days for high-security environments
 - **Emergency:** Immediately if key compromise is suspected
 
+**Service Availability During Rotation:**
+- ⚠️ **Downtime Required:** The token rotation process requires deleting the existing token, which will cause service disruption for any processes or services using the token.
+- **Impact:** Between steps 3 (delete token) and 5 (complete OAuth), the service cannot make authenticated GitHub API calls.
+- **Recommended Approach:**
+  - Schedule rotation during a maintenance window with minimal traffic
+  - Notify all stakeholders before beginning the rotation
+  - For critical services, consider having a backup authentication method ready
+  - If multiple services share the same token, coordinate rotation to minimize total downtime
+  - Test the OAuth flow in advance to ensure quick re-authentication
+- **Estimated Downtime:** 5-15 minutes depending on OAuth flow completion time
+
 **Limitations:**
 - Manual process - no automatic key rotation yet
 - Requires re-authentication after rotation
 - Cannot decrypt old tokens with the new key (by design)
+- Single-user design means all services share the same token
 
 ##### IAM Setup Requirements
 
@@ -434,6 +446,17 @@ To access Firestore, the Cloud Run service account must have appropriate IAM rol
   - Navigate to Cloud Console → IAM & Admin → Audit Logs
   - Enable Data Read and Data Write logging for Cloud Datastore API
   - Review logs regularly for unauthorized access attempts
+  - **Suspicious Patterns to Monitor:**
+    - Multiple failed authentication attempts from the same service account
+    - Firestore access from unexpected IP addresses or regions
+    - Unusual read volume on the `github_tokens` collection
+    - Access attempts outside normal service hours
+    - Changes to IAM policies for Firestore or service accounts
+  - **Recommended Alerts:**
+    - Set up Cloud Monitoring alerts for Firestore permission denied errors (403)
+    - Alert on unexpected service account usage
+    - Monitor for encryption/decryption failures
+    - Track changes to the encryption key environment variable
 
 - **Principle of Least Privilege:** Grant only `roles/datastore.user`, not `roles/datastore.owner`, unless delete operations are required
 
@@ -457,7 +480,7 @@ The service provides a secure admin endpoint that returns metadata only (never t
 
 ```bash
 # Access via gcloud proxy (requires IAM authentication)
-gcloud run services proxy github-app-token-service --region us-central1
+gcloud beta run proxy github-app-token-service --region us-central1
 
 # In another terminal, call the endpoint
 curl http://localhost:8080/admin/token-metadata
@@ -535,6 +558,29 @@ python scripts/show_token_metadata.py --collection my_tokens --doc-id user123
 - ⚠️ Never commit encryption keys to version control
 - ⚠️ Never share encryption keys via email, Slack, or other communication channels
 
+**Encryption Key Management Security:**
+- ⚠️ **Shell History Exposure:** When setting `GITHUB_TOKEN_ENCRYPTION_KEY` via `export`, the key will be saved in shell history
+  - Mitigation: Use `set +o history` before setting the variable, then `set -o history` after
+  - Better: Use Secret Manager to avoid environment variables entirely
+  - Alternative: Prefix the command with a space (in bash with `HISTCONTROL=ignorespace`)
+- ⚠️ **Plaintext Key Storage:** Environment variables are visible to processes and may appear in logs
+  - **Production:** Always use Google Secret Manager to inject keys securely
+  - **Never** set encryption keys directly via `--update-env-vars` in production
+  - Use `--set-secrets` with Secret Manager references instead
+- ⚠️ **Potential Token Exposure:** During local development, tokens may be exposed through:
+  - Browser developer tools when viewing OAuth callbacks
+  - Application logs if debug logging is enabled
+  - Process environment inspection tools
+  - Always use `APP_ENV=prod` settings in production to enforce security validations
+
+**Authentication and Authorization:**
+- ⚠️ **Insufficient Auth Guidance:** The `/admin/token-metadata` endpoint relies entirely on Cloud Run IAM
+  - **CRITICAL:** Always deploy with `--no-allow-unauthenticated`
+  - Verify IAM policies with `gcloud run services get-iam-policy`
+  - Grant `roles/run.invoker` only to specific users/service accounts
+  - Regularly audit who has access to the Cloud Run service
+  - Do not rely on obscurity - IAM authentication is your only protection
+
 **Token Lifecycle:**
 - Tokens are encrypted immediately upon receipt from GitHub
 - Tokens remain encrypted in Firestore at rest
@@ -562,6 +608,7 @@ firebase emulators:start --only firestore
 # Set emulator environment variable (in another terminal)
 export FIRESTORE_EMULATOR_HOST=localhost:8080
 export GCP_PROJECT_ID=demo-project  # Any value works with emulator
+export GOOGLE_APPLICATION_CREDENTIALS=""  # Prevents ADC lookup
 export GITHUB_TOKEN_ENCRYPTION_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
 
 # Run the service
@@ -741,6 +788,7 @@ firebase emulators:start --only firestore
 
 # Set emulator environment variable
 export FIRESTORE_EMULATOR_HOST=localhost:8080
+export GOOGLE_APPLICATION_CREDENTIALS=""  # Prevents ADC lookup
 ```
 
 ## Running Locally
@@ -950,7 +998,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 **Cloud Run (with gcloud proxy):**
 ```bash
 # Start authenticated proxy
-gcloud run services proxy github-app-token-service --region us-central1
+gcloud beta run proxy github-app-token-service --region us-central1
 
 # The service will be available at http://localhost:8080
 ```
@@ -1590,7 +1638,7 @@ gcloud run services remove-iam-policy-binding github-app-token-service \
 
 ```bash
 # Proxy requests with automatic authentication
-gcloud run services proxy github-app-token-service \
+gcloud beta run proxy github-app-token-service \
   --region us-central1 \
   --project your-gcp-project-id
 
@@ -1625,7 +1673,7 @@ The `/docs` (Swagger UI) and `/openapi.json` endpoints are **protected by IAM** 
 
 ```bash
 # Access Swagger UI through authenticated proxy
-gcloud run services proxy github-app-token-service --region us-central1
+gcloud beta run proxy github-app-token-service --region us-central1
 # Then navigate to http://localhost:8080/docs in your browser
 ```
 
