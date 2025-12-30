@@ -127,6 +127,9 @@ GITHUB_OAUTH_REDIRECT_URI=<your-redirect-uri>  # OAuth callback URL
 # GCP Configuration (required for Firestore)
 GCP_PROJECT_ID=<your-project-id>
 GOOGLE_APPLICATION_CREDENTIALS=<path-to-credentials-json>
+
+# Token Storage Encryption (required for production)
+GITHUB_TOKEN_ENCRYPTION_KEY=<64-char-hex-key>  # Generate with: python -c 'import secrets; print(secrets.token_hex(32))'
 ```
 
 ### PEM Key Format
@@ -162,6 +165,10 @@ ENABLE_CORS=false      # Enable CORS middleware (default: false)
 
 # GitHub Webhook Secret (optional, but recommended for production)
 GITHUB_WEBHOOK_SECRET=<your-webhook-secret>  # For webhook signature verification
+
+# Token Storage (optional, defaults provided)
+GITHUB_TOKENS_COLLECTION=github_tokens  # Firestore collection name for tokens
+GITHUB_TOKENS_DOC_ID=primary_user       # Document ID for the primary token
 ```
 
 ### Development Defaults
@@ -223,12 +230,550 @@ async def example_endpoint(dao: FirestoreDAO = Depends(get_firestore_dao)):
     return {"status": "ok"}
 ```
 
-#### Important Security Notes
+#### GitHub Token Storage in Firestore
 
-⚠️ **DO NOT store real secrets or sensitive user data in Firestore yet**
-- Use placeholder collections only for testing (e.g., `test_collection`, `placeholder_data`)
-- Real token/user data persistence requires additional security measures
-- Always validate and sanitize data before persisting
+The service stores GitHub OAuth tokens securely in Firestore with encryption. This section describes the storage schema, encryption strategy, and operational procedures.
+
+##### Firestore Schema
+
+**Collection:** `github_tokens` (configurable via `GITHUB_TOKENS_COLLECTION`)
+
+**Document ID:** `primary_user` (configurable via `GITHUB_TOKENS_DOC_ID`)
+
+**Document Structure:**
+
+| Field | Type | Description | Encrypted |
+|-------|------|-------------|-----------|
+| `access_token` | String | GitHub OAuth access token | ✅ Yes (AES-256-GCM) |
+| `token_type` | String | Token type (typically "bearer") | ❌ No |
+| `scope` | String | OAuth scopes granted (e.g., "repo,user:email,read:org") | ❌ No |
+| `expires_at` | String | ISO 8601 UTC timestamp of token expiration (null if no expiry) | ❌ No |
+| `refresh_token` | String | Optional refresh token for token renewal | ✅ Yes (AES-256-GCM) |
+| `updated_at` | String | ISO 8601 UTC timestamp when token was last saved | ❌ No |
+
+**Encryption Format:**
+- Encrypted fields are stored as Base64-encoded strings
+- Format: `base64(nonce || ciphertext || auth_tag)`
+  - `nonce`: 12 bytes (96 bits) - randomly generated per encryption
+  - `ciphertext`: Variable length - encrypted token data
+  - `auth_tag`: 16 bytes (128 bits) - GCM authentication tag
+
+**Example Document (in Firestore):**
+```json
+{
+  "access_token": "WyRQmxK7pNjM3kL2pHqR8vS9wT0uA1bC2dE3fF4gG5hH6iI7jJ8kK9lL0mM1nN2oO3pP4qQ5rR6sS7tT8uU9vV0wW1xX2yY3zZ4aA5bB6cC7dD8eE9fF0gG1hH2iI3jJ4kK5lL==",
+  "token_type": "bearer",
+  "scope": "repo,user:email,read:org",
+  "expires_at": null,
+  "refresh_token": null,
+  "updated_at": "2025-12-30T19:00:00.000000+00:00"
+}
+```
+
+⚠️ **IMPORTANT:** Never copy the `access_token` or `refresh_token` fields from Firestore into logs, issue trackers, or documentation. These encrypted values cannot be decrypted without the encryption key, but exposing them is still a security risk.
+
+##### Encryption Strategy
+
+The service uses a **defense-in-depth** encryption strategy with multiple layers:
+
+**1. GCP-Managed Encryption at Rest (Default)**
+- All Firestore data is automatically encrypted at rest by Google Cloud Platform
+- Uses Google-managed encryption keys (GMEK)
+- Transparent to applications - no configuration required
+- Provides baseline security for all stored data
+
+**2. Application-Level Encryption (Required)**
+- Additional encryption layer using AES-256 in GCM mode
+- Protects tokens even if Firestore data is compromised
+- Requires explicit configuration via environment variable
+
+**Encryption Algorithm:** AES-256-GCM
+- **AES-256**: Advanced Encryption Standard with 256-bit keys
+- **GCM**: Galois/Counter Mode - provides both confidentiality and authenticity
+- **Key Size:** 32 bytes (256 bits)
+- **Nonce Size:** 12 bytes (96 bits, randomly generated per encryption)
+- **Authentication Tag:** 16 bytes (128 bits)
+
+**Required Environment Variable:**
+```bash
+# Generate a new encryption key (32 bytes = 64 hex characters)
+export GITHUB_TOKEN_ENCRYPTION_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
+
+# Example output: c4f9a8b2e7d6f1a3c9b8e7f6a5d4c3b2a1f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5
+```
+
+**Production Configuration:**
+```bash
+# For Cloud Run deployment - set as environment variable
+gcloud run services update github-app-token-service \
+  --region us-central1 \
+  --update-env-vars GITHUB_TOKEN_ENCRYPTION_KEY=your_64_char_hex_key \
+  --project your-gcp-project-id
+```
+
+⚠️ **CRITICAL:** For production, use Google Secret Manager instead of environment variables:
+```bash
+# Store encryption key in Secret Manager
+echo -n "your_64_char_hex_key" | gcloud secrets create github-token-encryption-key --data-file=-
+
+# Deploy Cloud Run with secret reference
+gcloud run deploy github-app-token-service \
+  --set-secrets="GITHUB_TOKEN_ENCRYPTION_KEY=github-token-encryption-key:latest" \
+  --project your-gcp-project-id
+```
+
+##### Key Rotation
+
+To rotate the encryption key, you must re-encrypt all stored tokens with the new key. This service does not currently support automatic key rotation, so manual intervention is required:
+
+**Key Rotation Steps:**
+
+1. **Generate a new encryption key:**
+   ```bash
+   python -c 'import secrets; print(secrets.token_hex(32))'
+   ```
+
+2. **Backup existing tokens** (optional, for rollback):
+   - Use the Firestore console or `gcloud firestore export` to backup data
+   - Or use `show_token_metadata.py` to record metadata
+
+3. **Delete the old token** (forces re-authentication):
+   ```bash
+   python scripts/reset_github_token.py
+   ```
+
+4. **Update the encryption key** in your deployment:
+   ```bash
+   # For Cloud Run
+   gcloud run services update github-app-token-service \
+     --update-env-vars GITHUB_TOKEN_ENCRYPTION_KEY=new_64_char_hex_key \
+     --project your-gcp-project-id
+   
+   # Or update Secret Manager
+   echo -n "new_64_char_hex_key" | gcloud secrets versions add github-token-encryption-key --data-file=-
+   ```
+
+5. **Re-run the OAuth flow** to store a new token encrypted with the new key:
+   - Navigate to `https://<your-service-name>.run.app/github/install`
+   - Complete the GitHub authorization flow
+   - New token will be encrypted with the new key
+
+**Rotation Frequency:**
+- **Recommended:** Every 90 days minimum
+- **Best Practice:** Every 30 days for high-security environments
+- **Emergency:** Immediately if key compromise is suspected
+
+**Service Availability During Rotation:**
+- ⚠️ **Downtime Required:** The token rotation process requires deleting the existing token, which will cause service disruption for any processes or services using the token.
+- **Impact:** Between steps 3 (delete token) and 5 (complete OAuth), the service cannot make authenticated GitHub API calls.
+- **Recommended Approach:**
+  - Schedule rotation during a maintenance window with minimal traffic
+  - Notify all stakeholders before beginning the rotation
+  - For critical services, consider having a backup authentication method ready
+  - If multiple services share the same token, coordinate rotation to minimize total downtime
+  - Test the OAuth flow in advance to ensure quick re-authentication
+- **Estimated Downtime:** 5-15 minutes depending on OAuth flow completion time
+
+**Limitations:**
+- Manual process - no automatic key rotation yet
+- Requires re-authentication after rotation
+- Cannot decrypt old tokens with the new key (by design)
+- Single-user design means all services share the same token
+
+##### IAM Setup Requirements
+
+To access Firestore, the Cloud Run service account must have appropriate IAM roles.
+
+**Required IAM Role:**
+- `roles/datastore.user` (read/write access to Firestore)
+- OR `roles/datastore.owner` (full access, includes delete)
+
+**Recommended:** Use `roles/datastore.user` for least privilege.
+
+**Grant IAM Permissions:**
+
+1. **Identify the Cloud Run service account:**
+   ```bash
+   # Get the service account used by Cloud Run
+   SERVICE_ACCOUNT=$(gcloud run services describe github-app-token-service \
+     --region us-central1 \
+     --format 'value(spec.template.spec.serviceAccountName)' \
+     --project $PROJECT_ID)
+   
+   # If empty, Cloud Run uses the default compute service account
+   if [ -z "$SERVICE_ACCOUNT" ]; then
+     PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+     SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+     echo "Using default compute service account: $SERVICE_ACCOUNT"
+   fi
+   ```
+
+2. **Grant Firestore access:**
+   ```bash
+   gcloud projects add-iam-policy-binding $PROJECT_ID \
+     --member="serviceAccount:${SERVICE_ACCOUNT}" \
+     --role="roles/datastore.user"
+   ```
+
+3. **Verify IAM permissions:**
+   ```bash
+   gcloud projects get-iam-policy $PROJECT_ID \
+     --flatten="bindings[].members" \
+     --format="table(bindings.role)" \
+     --filter="bindings.members:serviceAccount:${SERVICE_ACCOUNT}"
+   ```
+
+**Best Practices:**
+- **Dedicated Service Account:** Create a dedicated service account for Cloud Run instead of using the default compute account:
+  ```bash
+  # Create dedicated service account
+  gcloud iam service-accounts create github-app-token-service \
+    --display-name="GitHub App Token Service" \
+    --project your-gcp-project-id
+  
+  # Grant Firestore access
+  gcloud projects add-iam-policy-binding your-gcp-project-id \
+    --member="serviceAccount:github-app-token-service@your-gcp-project-id.iam.gserviceaccount.com" \
+    --role="roles/datastore.user"
+  
+  # Deploy Cloud Run with dedicated service account
+  gcloud run deploy github-app-token-service \
+    --service-account github-app-token-service@your-gcp-project-id.iam.gserviceaccount.com \
+    --project your-gcp-project-id
+  ```
+
+- **Enable Audit Logging:** Monitor Firestore access via Cloud Audit Logs:
+  - Navigate to Cloud Console → IAM & Admin → Audit Logs
+  - Enable Data Read and Data Write logging for Cloud Datastore API
+  - Review logs regularly for unauthorized access attempts
+  - **Suspicious Patterns to Monitor:**
+    - Multiple failed authentication attempts from the same service account
+    - Firestore access from unexpected IP addresses or regions
+    - Unusual read volume on the `github_tokens` collection
+    - Access attempts outside normal service hours
+    - Changes to IAM policies for Firestore or service accounts
+  - **Recommended Alerts:**
+    - Set up Cloud Monitoring alerts for Firestore permission denied errors (403)
+    - Alert on unexpected service account usage
+    - Monitor for encryption/decryption failures
+    - Track changes to the encryption key environment variable
+
+- **Principle of Least Privilege:** Grant only `roles/datastore.user`, not `roles/datastore.owner`, unless delete operations are required
+
+##### Inspecting Token Metadata
+
+Operators can inspect token metadata (without exposing the actual token) using three methods:
+
+**Method 1: Cloud Console (Firestore UI)**
+
+1. Navigate to Cloud Console → Firestore → Data
+2. Select the `github_tokens` collection
+3. Click the `primary_user` document
+4. View metadata fields:
+   - `token_type`, `scope`, `expires_at`, `updated_at`
+   - `access_token` and `refresh_token` show encrypted Base64 strings
+5. ⚠️ **DO NOT** copy or share the encrypted `access_token` field
+
+**Method 2: `/admin/token-metadata` API Endpoint**
+
+The service provides a secure admin endpoint that returns metadata only (never the actual token):
+
+```bash
+# Access via gcloud proxy (requires IAM authentication)
+gcloud beta run proxy github-app-token-service --region us-central1
+
+# In another terminal, call the endpoint
+curl http://localhost:8080/admin/token-metadata
+
+# Example response:
+{
+  "token_type": "bearer",
+  "scope": "repo,user:email,read:org",
+  "expires_at": null,
+  "has_refresh_token": true,
+  "updated_at": "2025-12-30T19:00:00.000000+00:00"
+}
+```
+
+**Security:** This endpoint relies on Cloud Run IAM authentication. Ensure Cloud Run is deployed with `--no-allow-unauthenticated` and grant `roles/run.invoker` only to authorized users.
+
+**Method 3: `show_token_metadata.py` CLI Script**
+
+For local or automated inspection, use the provided CLI script:
+
+```bash
+# Set up authentication
+export GCP_PROJECT_ID=your-gcp-project-id
+gcloud auth application-default login
+
+# Show token metadata (default location)
+python scripts/show_token_metadata.py
+
+# Output:
+# GitHub Token Metadata
+# ==================================================
+# Token Type:       bearer
+# Scope:            repo,user:email,read:org
+# Expires At:       never
+# Has Refresh:      False
+# Updated At:       2025-12-30T19:00:00.000000+00:00
+# ==================================================
+
+# JSON output for automation
+python scripts/show_token_metadata.py --json
+
+# Custom collection/document
+python scripts/show_token_metadata.py --collection my_tokens --doc-id user123
+```
+
+**What Metadata is Exposed:**
+- ✅ `token_type` - Token type (e.g., "bearer")
+- ✅ `scope` - OAuth scopes granted
+- ✅ `expires_at` - Expiration timestamp (if applicable)
+- ✅ `has_refresh_token` - Boolean indicating if refresh token exists
+- ✅ `updated_at` - Last update timestamp
+
+**What is NEVER Exposed:**
+- ❌ `access_token` - The decrypted GitHub access token
+- ❌ `refresh_token` - The decrypted refresh token
+- ❌ Encrypted ciphertext values
+
+##### Security Considerations
+
+**No Endpoint Returns the Raw Token:**
+- The `/oauth/callback` endpoint stores the token but never displays it
+- The `/admin/token-metadata` endpoint returns only metadata
+- Logs mask tokens showing only first 8 and last 4 characters
+- No API endpoint exists to retrieve the decrypted token
+
+**Logging Best Practices:**
+- All token values are masked in logs using `mask_sensitive_data()`
+- Example: `ghp_abc12...xyz9` instead of full token
+- Correlation IDs track OAuth flows without exposing tokens
+- Never log decrypted tokens or encryption keys
+
+**Encrypted Data Handling:**
+- ⚠️ Never copy encrypted `access_token` or `refresh_token` fields from Firestore
+- ⚠️ Never paste encrypted blobs into issue trackers, logs, or documentation
+- ⚠️ Never commit encryption keys to version control
+- ⚠️ Never share encryption keys via email, Slack, or other communication channels
+
+**Encryption Key Management Security:**
+- ⚠️ **Shell History Exposure:** When setting `GITHUB_TOKEN_ENCRYPTION_KEY` via `export`, the key will be saved in shell history
+  - Mitigation: Use `set +o history` before setting the variable, then `set -o history` after
+  - Better: Use Secret Manager to avoid environment variables entirely
+  - Alternative: Prefix the command with a space (in bash with `HISTCONTROL=ignorespace`)
+- ⚠️ **Plaintext Key Storage:** Environment variables are visible to processes and may appear in logs
+  - **Production:** Always use Google Secret Manager to inject keys securely
+  - **Never** set encryption keys directly via `--update-env-vars` in production
+  - Use `--set-secrets` with Secret Manager references instead
+- ⚠️ **Potential Token Exposure:** During local development, tokens may be exposed through:
+  - Browser developer tools when viewing OAuth callbacks
+  - Application logs if debug logging is enabled
+  - Process environment inspection tools
+  - Always use `APP_ENV=prod` settings in production to enforce security validations
+
+**Authentication and Authorization:**
+- ⚠️ **Insufficient Auth Guidance:** The `/admin/token-metadata` endpoint relies entirely on Cloud Run IAM
+  - **CRITICAL:** Always deploy with `--no-allow-unauthenticated`
+  - Verify IAM policies with `gcloud run services get-iam-policy`
+  - Grant `roles/run.invoker` only to specific users/service accounts
+  - Regularly audit who has access to the Cloud Run service
+  - Do not rely on obscurity - IAM authentication is your only protection
+
+**Token Lifecycle:**
+- Tokens are encrypted immediately upon receipt from GitHub
+- Tokens remain encrypted in Firestore at rest
+- Tokens are only decrypted in memory when needed for API calls
+- No caching of decrypted tokens in application memory
+
+**Incident Response:**
+- If encryption key is compromised, rotate immediately following key rotation steps
+- If Firestore access is compromised, revoke IAM permissions and rotate key
+- If token is leaked, revoke it in GitHub App settings and re-authenticate
+
+##### Local Development Setup
+
+For local development, you have two options for Firestore access:
+
+**Option 1: Firestore Emulator (No GCP Project Required)**
+
+```bash
+# Install Firebase tools
+npm install -g firebase-tools
+
+# Start Firestore emulator
+firebase emulators:start --only firestore
+
+# Set emulator environment variable (in another terminal)
+export FIRESTORE_EMULATOR_HOST=localhost:8080
+export GCP_PROJECT_ID=demo-project  # Any value works with emulator
+export GOOGLE_APPLICATION_CREDENTIALS=""  # Prevents ADC lookup
+export GITHUB_TOKEN_ENCRYPTION_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
+
+# Run the service
+uvicorn app.main:app --reload
+```
+
+**Emulator Characteristics:**
+- No GCP credentials needed
+- Data is ephemeral (cleared on restart)
+- No IAM authentication required
+- Perfect for local testing and development
+
+**Option 2: Application Default Credentials (ADC) with GCP Project**
+
+```bash
+# Authenticate with your GCP account
+gcloud auth application-default login
+
+# Set project ID and encryption key
+export GCP_PROJECT_ID=your-gcp-project-id
+export GITHUB_TOKEN_ENCRYPTION_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
+
+# Run the service
+uvicorn app.main:app --reload
+```
+
+**ADC Characteristics:**
+- Uses real GCP Firestore database
+- Requires valid GCP project and permissions
+- Data persists across runs
+- Subject to IAM authentication
+- Useful for testing against production-like environment
+
+**Key Differences from Production:**
+
+| Aspect | Local (Emulator) | Local (ADC) | Production (Cloud Run) |
+|--------|-----------------|-------------|------------------------|
+| **Credentials** | None required | User credentials (ADC) | Service account |
+| **IAM Roles** | Not enforced | User's IAM roles | Service account IAM roles |
+| **Data Persistence** | Ephemeral | Persistent | Persistent |
+| **Encryption** | Required (same as prod) | Required (same as prod) | Required |
+| **Firestore** | Emulated locally | Real GCP Firestore | Real GCP Firestore |
+
+##### Troubleshooting
+
+**Firestore Permission Denied (403)**
+
+**Error:**
+```
+PermissionError: Permission denied accessing Firestore collection 'github_tokens'.
+Ensure the service account has proper IAM roles (roles/datastore.user or roles/datastore.owner).
+```
+
+**Cause:**
+- Cloud Run service account lacks Firestore IAM permissions
+
+**Fix:**
+```bash
+# Identify service account
+SERVICE_ACCOUNT=$(gcloud run services describe github-app-token-service \
+  --region us-central1 \
+  --format 'value(spec.template.spec.serviceAccountName)' \
+  --project your-gcp-project-id)
+
+# Grant Firestore access
+gcloud projects add-iam-policy-binding your-gcp-project-id \
+  --member="serviceAccount:${SERVICE_ACCOUNT}" \
+  --role="roles/datastore.user"
+
+# Wait 1-2 minutes for IAM changes to propagate
+```
+
+**Missing Encryption Key**
+
+**Error:**
+```
+ValueError: Encryption key not configured. Set GITHUB_TOKEN_ENCRYPTION_KEY environment variable.
+```
+
+**Cause:**
+- `GITHUB_TOKEN_ENCRYPTION_KEY` environment variable not set
+
+**Fix:**
+```bash
+# Local development
+export GITHUB_TOKEN_ENCRYPTION_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
+
+# Cloud Run
+gcloud run services update github-app-token-service \
+  --update-env-vars GITHUB_TOKEN_ENCRYPTION_KEY=your_64_char_hex_key \
+  --project your-gcp-project-id
+```
+
+**Decryption Failed**
+
+**Error:**
+```
+ValueError: Failed to decrypt token: Invalid authentication tag
+```
+
+**Possible Causes:**
+1. Encryption key was rotated but old token still exists
+2. Encrypted data was corrupted in Firestore
+3. Wrong encryption key is configured
+
+**Fix:**
+```bash
+# Delete the old token and re-authenticate
+python scripts/reset_github_token.py
+
+# Navigate to the OAuth flow to create a new token
+# https://your-service.run.app/github/install
+```
+
+**Token Document Not Found**
+
+**Error:**
+```
+404 Not Found: Token document not found in Firestore
+```
+
+**Cause:**
+- OAuth flow has not been completed yet
+- Document was deleted manually
+
+**Fix:**
+```bash
+# Complete the OAuth flow to create a token
+# Navigate to: https://your-service.run.app/github/install
+# Or locally: http://localhost:8000/github/install
+```
+
+##### Limitations and Future Work
+
+**Current Limitations:**
+
+1. **Single-User Design:**
+   - Only one token is stored per deployment (document ID: `primary_user`)
+   - No support for multiple users or multi-tenant scenarios
+   - No user authentication or session management
+
+2. **No Automatic Token Refresh:**
+   - GitHub user-to-server tokens typically don't expire
+   - If tokens do expire, manual re-authentication is required
+   - No background job to refresh tokens proactively
+
+3. **Manual Key Rotation:**
+   - Key rotation requires manual intervention and re-authentication
+   - No automatic re-encryption of existing tokens with new keys
+
+4. **In-Memory State:**
+   - OAuth state tokens are stored in memory (lost on restart)
+   - Not suitable for multi-instance deployments without external state store
+
+**Future Enhancements (Out of Scope for Current Implementation):**
+
+- Multi-user support with per-user token storage
+- Automatic token refresh before expiration
+- Key rotation with automatic re-encryption
+- Redis/Memcache for distributed OAuth state storage
+- Token usage analytics and monitoring
+- Automatic token revocation on inactivity
+- Support for GitHub App installation tokens (in addition to OAuth tokens)
+
+**These enhancements are explicitly out of scope** to maintain focus on the core single-user token storage functionality. Implementing multi-user support or token refresh workflows requires significant architectural changes and is not part of the current design.
 
 #### Firestore Emulator (Optional)
 
@@ -243,6 +788,7 @@ firebase emulators:start --only firestore
 
 # Set emulator environment variable
 export FIRESTORE_EMULATOR_HOST=localhost:8080
+export GOOGLE_APPLICATION_CREDENTIALS=""  # Prevents ADC lookup
 ```
 
 ## Running Locally
@@ -349,17 +895,19 @@ Browser clients should never call this endpoint directly.
 
 **Token Handling:**
 - ✅ Tokens are logged (masked) with correlation IDs for debugging
-- ❌ Tokens are **NOT persisted** to any database or storage
-- ⚠️ This is intentional for single-user interactive demo scenarios
-- ⚠️ Production multi-user apps should implement secure token storage
+- ✅ Tokens are **securely persisted** to Firestore with AES-256-GCM encryption
+- ✅ OAuth flow stores token immediately after successful authorization
+- ⚠️ Single-user design: one token per deployment (document ID: `primary_user`)
+- ⚠️ Multi-user token management requires additional architecture (out of scope)
 
 **Example Success Flow:**
 1. User navigates to `/github/install` in browser
 2. User authorizes the app on GitHub's website
 3. GitHub redirects to `/oauth/callback?code=abc123...&state=xyz789...`
 4. Service validates state and exchanges code for access token
-5. User sees HTML success page: "Authorization Successful"
-6. Logs show masked token: `ghp_abc12...xyz9`
+5. Token is encrypted and stored in Firestore
+6. User sees HTML success page: "Authorization Successful"
+7. Logs show masked token: `ghp_abc12...xyz9`
 
 **Example Error Flow (State Mismatch):**
 1. User opens `/github/install` with cookies disabled
@@ -450,7 +998,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 **Cloud Run (with gcloud proxy):**
 ```bash
 # Start authenticated proxy
-gcloud run services proxy github-app-token-service --region us-central1
+gcloud beta run proxy github-app-token-service --region us-central1
 
 # The service will be available at http://localhost:8080
 ```
@@ -525,7 +1073,7 @@ http://localhost:8000/oauth/callback?code=abc123...&state=xyz789...
 }
 ```
 
-**⚠️ Important Note:** Access tokens are logged (with masking) but **NOT stored persistently**. This is intentional for the single-user interactive demo scenario. For production use, implement secure token storage.
+**⚠️ Important Note:** Access tokens are encrypted and securely stored in Firestore. Tokens are masked in logs showing only first 8 and last 4 characters (e.g., `ghp_abc12...xyz9`). The service uses AES-256-GCM encryption with a required encryption key set via `GITHUB_TOKEN_ENCRYPTION_KEY` environment variable.
 
 ### Troubleshooting OAuth Issues
 
@@ -686,19 +1234,19 @@ You may need to regenerate OAuth credentials if they're compromised or as part o
 
 ### OAuth API Limitations
 
-**⚠️ This OAuth implementation is designed for interactive, single-user scenarios only:**
+**⚠️ This OAuth implementation is designed for interactive, single-user scenarios:**
 
-- **No Token Persistence:** Access tokens are not stored in any database
-- **No Multi-User Support:** No user session management or token refresh
-- **No Token Refresh:** User must re-authenticate when tokens expire
-- **In-Memory State:** CSRF state tokens stored in memory (lost on restart)
-- **Single Instance:** State tokens not shared across multiple service instances
+- **Single-User Token Storage:** Tokens are encrypted and stored in Firestore but limited to one user per deployment
+- **No Multi-User Support:** No user session management or per-user token isolation
+- **No Automatic Token Refresh:** User must re-authenticate when tokens expire (though GitHub user tokens typically don't expire)
+- **In-Memory OAuth State:** CSRF state tokens stored in memory (lost on restart)
+- **Single Instance State:** OAuth state tokens not shared across multiple service instances
 
 **For Production Multi-User Applications, Consider:**
-- Implementing database storage for OAuth tokens (encrypted at rest)
-- Using Redis/Memcache for distributed state token storage
+- Implementing per-user token storage with user authentication
+- Using Redis/Memcache for distributed OAuth state token storage
 - Adding user session management with secure cookies
-- Implementing token refresh logic for long-lived sessions
+- Implementing automatic token refresh logic for tokens with expiration
 - Setting up proper CORS policies for frontend applications
 - Using OAuth state parameter for deep linking after authentication
 
@@ -1090,7 +1638,7 @@ gcloud run services remove-iam-policy-binding github-app-token-service \
 
 ```bash
 # Proxy requests with automatic authentication
-gcloud run services proxy github-app-token-service \
+gcloud beta run proxy github-app-token-service \
   --region us-central1 \
   --project your-gcp-project-id
 
@@ -1125,7 +1673,7 @@ The `/docs` (Swagger UI) and `/openapi.json` endpoints are **protected by IAM** 
 
 ```bash
 # Access Swagger UI through authenticated proxy
-gcloud run services proxy github-app-token-service --region us-central1
+gcloud beta run proxy github-app-token-service --region us-central1
 # Then navigate to http://localhost:8080/docs in your browser
 ```
 
@@ -1327,13 +1875,27 @@ This service now includes:
   - Comprehensive error handling and user-friendly HTML responses
   - Token logging with masking for security
   - Correlation ID tracking for debugging
+  - Encrypted token persistence to Firestore
+  
+- **Encrypted Token Storage**: Firestore-based persistence
+  - AES-256-GCM encryption for access and refresh tokens
+  - Configurable collection name and document ID
+  - Automatic timestamp normalization (UTC ISO-8601)
+  - Metadata-only inspection endpoints
+  - IAM-based access control
+  
+- **Admin Tools**:
+  - `/admin/token-metadata` endpoint for metadata inspection
+  - `show_token_metadata.py` CLI script for operational queries
+  - `reset_github_token.py` CLI script for token deletion
   
 - **Security Features**:
   - CSRF protection via state tokens
   - State token expiration and cleanup
   - Token masking in logs
   - Correlation IDs for OAuth flow tracking
-  - No token persistence (development/demo mode)
+  - Defense-in-depth encryption (GCP + application-level)
+  - IAM-based Firestore access control
 
 ### 🔧 Usage Examples
 
@@ -1360,11 +1922,18 @@ headers = {
 
 #### Testing OAuth Flow Locally
 ```bash
-# Start the service
+# Start the service with required environment variables
 export GITHUB_CLIENT_ID=Iv1.your_client_id
 export GITHUB_CLIENT_SECRET=your_client_secret
 export GITHUB_APP_ID=your_app_id
 export GITHUB_OAUTH_REDIRECT_URI=http://localhost:8000/oauth/callback
+export GITHUB_TOKEN_ENCRYPTION_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
+export GCP_PROJECT_ID=your-gcp-project-id
+
+# Authenticate with GCP (for Firestore)
+gcloud auth application-default login
+
+# Run the service
 uvicorn app.main:app --reload
 
 # Visit in browser
@@ -1372,15 +1941,21 @@ open http://localhost:8000/github/install
 
 # Or with custom scopes
 open http://localhost:8000/github/install?scopes=repo,user
+
+# Check token metadata after OAuth flow
+python scripts/show_token_metadata.py
 ```
 
 ### 📝 Future Enhancements
 - Add GitHub API integration logic for repositories and installations
 - Implement token minting endpoints for installation access tokens
 - Add webhook handlers for GitHub App events
-- Consider Redis/Memcache for distributed state token storage
-- Add rate limiting for OAuth endpoints
-- Implement user session management
+- Multi-user support with per-user token storage
+- Automatic token refresh before expiration
+- Key rotation with automatic re-encryption
+- Redis/Memcache for distributed OAuth state token storage
+- Rate limiting for OAuth endpoints
+- User session management with authentication
 - Set up CI/CD pipelines
 
 
