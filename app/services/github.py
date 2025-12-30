@@ -444,7 +444,9 @@ class GitHubTokenRefreshManager:
                 # Parse ISO datetime string to timezone-aware datetime
                 last_attempt = None
                 try:
-                    last_attempt = datetime.fromisoformat(last_attempt_str)
+                    # Handle 'Z' suffix for UTC (fromisoformat doesn't handle it in Python < 3.11)
+                    datetime_str = last_attempt_str.replace('Z', '+00:00')
+                    last_attempt = datetime.fromisoformat(datetime_str)
                     # Ensure timezone-aware - if naive, assume UTC
                     if last_attempt.tzinfo is None:
                         last_attempt = last_attempt.replace(tzinfo=timezone.utc)
@@ -635,7 +637,24 @@ class GitHubTokenRefreshManager:
                         await asyncio.sleep(backoff)
                         continue
                     
-                    data = response.json()
+                    # Parse JSON response
+                    try:
+                        data = response.json()
+                    except Exception as json_error:
+                        error_msg = f"Failed to parse JSON response from GitHub: {str(json_error)}"
+                        logger.error(
+                            error_msg,
+                            extra={"extra_fields": {
+                                "response_text_preview": response.text[:200] if response.text else "empty",
+                                "attempt": attempt + 1
+                            }}
+                        )
+                        # On last attempt, raise error; otherwise retry
+                        if attempt == max_retries - 1:
+                            raise GitHubTokenRefreshError(error_msg)
+                        backoff = min(2 ** attempt, 8)
+                        await asyncio.sleep(backoff)
+                        continue
                     
                     # Check for error in response
                     if "error" in data:
