@@ -320,13 +320,420 @@ If you see "Address already in use" errors, change the `PORT` environment variab
 
 Ensure you've activated your virtual environment and installed all dependencies.
 
+## Docker Containerization
+
+The service includes a production-ready Dockerfile based on `python:3.11-slim` with gunicorn and uvicorn workers.
+
+### Building the Docker Image
+
+#### Local Build
+
+```bash
+# Using Makefile
+make docker-build
+
+# Or directly with docker
+docker build -t github-app-token-service:latest .
+```
+
+#### Build for Google Container Registry (GCR)
+
+```bash
+# Set your project ID
+export PROJECT_ID=your-gcp-project-id
+
+# Build and tag for GCR
+make docker-build-gcr PROJECT_ID=$PROJECT_ID
+
+# Push to GCR
+make docker-push PROJECT_ID=$PROJECT_ID
+```
+
+#### Build Using Cloud Build
+
+```bash
+# Builds directly in GCP without local Docker
+make build-cloud PROJECT_ID=$PROJECT_ID
+```
+
+### Running the Docker Container Locally
+
+```bash
+# Using Makefile (runs on port 8080)
+make docker-run
+
+# Or directly with docker
+docker run -p 8080:8080 \
+  -e APP_ENV=dev \
+  -e PORT=8080 \
+  github-app-token-service:latest
+```
+
+Test the containerized service:
+```bash
+curl http://localhost:8080/healthz
+```
+
+### Docker Image Features
+
+- **Minimal Base**: Uses `python:3.11-slim` for small image size
+- **Multi-stage Build**: Separates build and runtime for optimization
+- **Non-root User**: Runs as `appuser` (UID 1000) for security
+- **Production Server**: Uses gunicorn with uvicorn workers
+- **Health Check**: Built-in Docker health check for `/healthz`
+- **PORT Handling**: Respects Cloud Run's `PORT` environment variable (defaults to 8080)
+
+## Cloud Run Deployment
+
+The service is designed for Google Cloud Run with IAM-based authentication.
+
+### Prerequisites
+
+1. **Google Cloud SDK**: Install from https://cloud.google.com/sdk/docs/install
+
+2. **Enable Required APIs**:
+```bash
+# Set your project
+gcloud config set project your-gcp-project-id
+
+# Enable APIs
+gcloud services enable run.googleapis.com
+gcloud services enable cloudbuild.googleapis.com
+gcloud services enable firestore.googleapis.com
+```
+
+3. **Configure Firestore Native Mode**:
+   - Go to [Google Cloud Console → Firestore](https://console.cloud.google.com/firestore)
+   - Create a Native mode database (not Datastore mode)
+   - Select region: **us-central1** (recommended) or your preferred region
+   - Wait for provisioning to complete
+
+### Deployment Steps
+
+#### 1. Build the Container Image
+
+Choose one of the following methods:
+
+**Option A: Cloud Build (Recommended)**
+```bash
+# Builds in GCP, no local Docker required
+make build-cloud PROJECT_ID=your-gcp-project-id
+```
+
+**Option B: Local Build + Push**
+```bash
+# Build locally and push to GCR
+make docker-build-gcr PROJECT_ID=your-gcp-project-id
+make docker-push PROJECT_ID=your-gcp-project-id
+```
+
+#### 2. Deploy to Cloud Run
+
+**With Placeholder Values (for testing)**:
+```bash
+make deploy PROJECT_ID=your-gcp-project-id REGION=us-central1
+```
+
+This deploys with placeholder GitHub credentials. The service will start but GitHub integration won't work until you update the environment variables.
+
+**With Real Secrets (production)**:
+```bash
+# Set environment variables
+export GITHUB_APP_ID=123456
+export GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
+export GITHUB_CLIENT_ID=Iv1.abc123
+export GITHUB_CLIENT_SECRET=ghp_abc123
+export GITHUB_WEBHOOK_SECRET=your_webhook_secret
+
+# Deploy with secrets
+make deploy-with-secrets PROJECT_ID=your-gcp-project-id REGION=us-central1
+```
+
+**Manual Deployment**:
+```bash
+gcloud run deploy github-app-token-service \
+  --image gcr.io/your-gcp-project-id/github-app-token-service:latest \
+  --platform managed \
+  --region us-central1 \
+  --no-allow-unauthenticated \
+  --set-env-vars APP_ENV=prod,GCP_PROJECT_ID=your-gcp-project-id,REGION=us-central1 \
+  --set-env-vars GITHUB_APP_ID=123456,GITHUB_PRIVATE_KEY="..." \
+  --set-env-vars GITHUB_CLIENT_ID=...,GITHUB_CLIENT_SECRET=... \
+  --set-env-vars GITHUB_WEBHOOK_SECRET=... \
+  --project your-gcp-project-id
+```
+
+#### 3. Update Environment Variables
+
+When GitHub credentials change, redeploy with updated values:
+
+```bash
+# Update specific environment variables
+gcloud run services update github-app-token-service \
+  --region us-central1 \
+  --update-env-vars GITHUB_APP_ID=new_value,GITHUB_PRIVATE_KEY="new_key" \
+  --project your-gcp-project-id
+```
+
+### IAM Configuration
+
+Cloud Run is deployed with `--no-allow-unauthenticated`, requiring IAM-based access control.
+
+#### Grant Access to Users
+
+```bash
+# Allow a specific user to invoke the service
+gcloud run services add-iam-policy-binding github-app-token-service \
+  --region us-central1 \
+  --member='user:alice@example.com' \
+  --role='roles/run.invoker' \
+  --project your-gcp-project-id
+```
+
+#### Grant Access to Service Accounts
+
+```bash
+# Allow a service account to invoke the service
+gcloud run services add-iam-policy-binding github-app-token-service \
+  --region us-central1 \
+  --member='serviceAccount:my-service@project-id.iam.gserviceaccount.com' \
+  --role='roles/run.invoker' \
+  --project your-gcp-project-id
+```
+
+#### Service-to-Service Authentication
+
+For Cloud Functions, Cloud Run, or other GCP services calling this service:
+
+```python
+import google.auth
+import google.auth.transport.requests
+import requests
+
+# Get the service URL
+SERVICE_URL = "https://github-app-token-service-xxxxx-uc.a.run.app"
+
+# Obtain ID token
+auth_req = google.auth.transport.requests.Request()
+credentials, project = google.auth.default()
+credentials.refresh(auth_req)
+id_token = credentials.id_token
+
+# Make authenticated request
+response = requests.get(
+    f"{SERVICE_URL}/healthz",
+    headers={"Authorization": f"Bearer {id_token}"}
+)
+```
+
+#### Revoke Access
+
+```bash
+# Remove user access
+gcloud run services remove-iam-policy-binding github-app-token-service \
+  --region us-central1 \
+  --member='user:alice@example.com' \
+  --role='roles/run.invoker' \
+  --project your-gcp-project-id
+```
+
+### Testing the Deployment
+
+#### Using gcloud (Recommended)
+
+```bash
+# Proxy requests with automatic authentication
+gcloud run services proxy github-app-token-service \
+  --region us-central1 \
+  --project your-gcp-project-id
+
+# In another terminal, make requests to localhost:8080
+curl http://localhost:8080/healthz
+curl http://localhost:8080/docs
+```
+
+Alternatively:
+```bash
+# One-time authenticated request
+gcloud run services describe github-app-token-service \
+  --region us-central1 \
+  --format 'value(status.url)' \
+  --project your-gcp-project-id
+
+# Get URL, then:
+curl -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  https://github-app-token-service-xxxxx-uc.a.run.app/healthz
+```
+
+#### Using Makefile
+
+```bash
+# Start authenticated proxy
+make invoke PROJECT_ID=your-gcp-project-id REGION=us-central1
+```
+
+### Accessing Documentation Endpoints
+
+The `/docs` (Swagger UI) and `/openapi.json` endpoints are **protected by IAM** and require authentication:
+
+```bash
+# Access Swagger UI through authenticated proxy
+gcloud run services proxy github-app-token-service --region us-central1
+# Then navigate to http://localhost:8080/docs in your browser
+```
+
+**Important**: These endpoints are NOT publicly accessible. All access requires:
+- IAM `roles/run.invoker` permission
+- Valid identity token in request headers
+
+### Firestore IAM Permissions
+
+Ensure the Cloud Run service account has Firestore access:
+
+```bash
+# Get the service account email (usually PROJECT_NUMBER-compute@developer.gserviceaccount.com)
+SERVICE_ACCOUNT=$(gcloud run services describe github-app-token-service \
+  --region us-central1 \
+  --format 'value(spec.template.spec.serviceAccountName)' \
+  --project your-gcp-project-id)
+
+# Grant Firestore access
+gcloud projects add-iam-policy-binding your-gcp-project-id \
+  --member="serviceAccount:${SERVICE_ACCOUNT}" \
+  --role="roles/datastore.user"
+```
+
+### Viewing Logs
+
+#### Using gcloud
+
+```bash
+# View recent logs
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=github-app-token-service" \
+  --limit 50 \
+  --format json \
+  --project your-gcp-project-id
+```
+
+#### Using Makefile
+
+```bash
+make logs PROJECT_ID=your-gcp-project-id
+```
+
+#### In Cloud Console
+
+Navigate to: **Cloud Run → github-app-token-service → LOGS**
+
+### Logging Details
+
+The service uses structured JSON logging compatible with Cloud Logging:
+
+- **Request Tracing**: Extracts trace IDs from `x-cloud-trace-context` header
+- **Structured Fields**: All logs include timestamp, level, logger, message
+- **Automatic Integration**: Cloud Run automatically ingests stdout/stderr
+- **Log Levels**: INFO (default), WARNING, ERROR, DEBUG
+
+Example log entry:
+```json
+{
+  "timestamp": "2025-12-30T06:00:00.000Z",
+  "level": "INFO",
+  "logger": "app.main",
+  "message": "Application starting",
+  "extra_fields": {
+    "app_env": "prod",
+    "region": "us-central1",
+    "port": 8080
+  }
+}
+```
+
+### PORT Environment Variable
+
+Cloud Run automatically sets the `PORT` environment variable. The application:
+- **Respects `$PORT`**: Binds to the Cloud Run-provided port
+- **Defaults to 8080**: Falls back when `PORT` is not set
+- **Dockerfile Default**: Sets `PORT=8080` for local consistency
+
+You typically don't need to set `PORT` manually in Cloud Run configuration.
+
+### Resource Configuration
+
+Adjust Cloud Run resources as needed:
+
+```bash
+gcloud run services update github-app-token-service \
+  --region us-central1 \
+  --memory 512Mi \
+  --cpu 1 \
+  --concurrency 80 \
+  --min-instances 0 \
+  --max-instances 10 \
+  --project your-gcp-project-id
+```
+
+### Common Deployment Issues
+
+#### Image Not Found
+```
+ERROR: (gcloud.run.deploy) Image 'gcr.io/...' not found
+```
+**Solution**: Run `make build-cloud` or verify the image was pushed to GCR.
+
+#### Permission Denied
+```
+ERROR: (gcloud.run.deploy) PERMISSION_DENIED: Permission denied on resource
+```
+**Solution**: Ensure you have `roles/run.admin` role in the GCP project.
+
+#### Service Won't Start
+```
+ERROR: The user-provided container failed to start and listen on the port defined by the PORT environment variable.
+```
+**Solution**: Check logs for startup errors. Verify required environment variables are set correctly.
+
+#### Firestore Access Denied
+**Solution**: Grant the service account `roles/datastore.user` as shown above.
+
+### Security Best Practices
+
+1. **Never Use `--allow-unauthenticated`**: Always deploy with `--no-allow-unauthenticated`
+2. **Principle of Least Privilege**: Grant `roles/run.invoker` only to specific users/service accounts
+3. **Rotate Secrets**: Regularly update GitHub credentials via `gcloud run services update`
+4. **Monitor Access**: Review IAM policies and Cloud Audit Logs periodically
+5. **Use Secret Manager**: For production, consider storing secrets in Secret Manager instead of environment variables
+6. **Enable VPC**: For additional security, deploy Cloud Run in a VPC Service Controls perimeter
+
+## Makefile Commands
+
+The project includes a Makefile for common workflows:
+
+```bash
+make help              # Show all available commands
+make install           # Install dependencies
+make run               # Run locally with uvicorn
+make test              # Run pytest tests
+make docker-build      # Build Docker image
+make docker-run        # Run Docker container locally
+make build-cloud       # Build image using Cloud Build
+make deploy            # Deploy to Cloud Run
+make invoke            # Access deployed service via proxy
+make logs              # View Cloud Run logs
+make clean             # Clean up local artifacts
+```
+
+All commands support overriding variables:
+```bash
+make deploy PROJECT_ID=my-project REGION=us-east1
+```
+
 ## Next Steps
 
 - Add GitHub API integration logic
 - Implement token minting endpoints
 - Add database persistence
 - Set up CI/CD pipelines
-- Configure Cloud Run deployment
 
 
 
