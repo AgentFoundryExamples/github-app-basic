@@ -25,8 +25,8 @@
       "summary": "Python configuration file (role: configuration)",
       "summary_text": "Python configuration file (role: configuration)",
       "metrics": {
-        "size_bytes": 6598,
-        "loc": 112,
+        "size_bytes": 8599,
+        "loc": 153,
         "todo_count": 0
       }
     },
@@ -53,8 +53,8 @@
       "summary": "Python module for firestore dao",
       "summary_text": "Python module for firestore dao",
       "metrics": {
-        "size_bytes": 6813,
-        "loc": 150,
+        "size_bytes": 17110,
+        "loc": 359,
         "todo_count": 0
       }
     },
@@ -81,7 +81,7 @@
       "summary": "Python module for firestore",
       "summary_text": "Python module for firestore",
       "metrics": {
-        "size_bytes": 2940,
+        "size_bytes": 2993,
         "loc": 51,
         "todo_count": 0
       }
@@ -207,8 +207,8 @@
       "summary": "Python module for logging",
       "summary_text": "Python module for logging",
       "metrics": {
-        "size_bytes": 3754,
-        "loc": 62,
+        "size_bytes": 4607,
+        "loc": 84,
         "todo_count": 0
       }
     },
@@ -249,8 +249,8 @@
       "summary": "Python test file (role: test)",
       "summary_text": "Python test file (role: test)",
       "metrics": {
-        "size_bytes": 8991,
-        "loc": 118,
+        "size_bytes": 12594,
+        "loc": 175,
         "todo_count": 0
       }
     },
@@ -263,8 +263,8 @@
       "summary": "Python test file (role: test)",
       "summary_text": "Python test file (role: test)",
       "metrics": {
-        "size_bytes": 17641,
-        "loc": 306,
+        "size_bytes": 40407,
+        "loc": 733,
         "todo_count": 0
       }
     },

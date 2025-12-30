@@ -43,11 +43,20 @@
       "type": "file",
       "external_dependencies": {
         "stdlib": [
+          "base64",
+          "datetime.datetime",
+          "datetime.timezone",
+          "secrets",
           "typing.Any",
           "typing.Dict",
           "typing.Optional"
         ],
         "third-party": [
+          "cryptography.exceptions.InvalidTag",
+          "cryptography.hazmat.backends.default_backend",
+          "cryptography.hazmat.primitives.ciphers.Cipher",
+          "cryptography.hazmat.primitives.ciphers.algorithms",
+          "cryptography.hazmat.primitives.ciphers.modes",
           "google.api_core.exceptions",
           "google.cloud.firestore"
         ]
@@ -241,7 +250,8 @@
       "type": "file",
       "external_dependencies": {
         "stdlib": [
-          "logging"
+          "logging",
+          "secrets"
         ],
         "third-party": [
           "pytest"
@@ -254,6 +264,11 @@
       "type": "file",
       "external_dependencies": {
         "stdlib": [
+          "base64",
+          "datetime.datetime",
+          "datetime.timedelta",
+          "datetime.timezone",
+          "secrets",
           "threading",
           "unittest.mock.AsyncMock",
           "unittest.mock.MagicMock",
@@ -393,6 +408,10 @@
       "target": "app/main.py"
     },
     {
+      "source": "tests/test_firestore_dao.py",
+      "target": "app/utils/logging.py"
+    },
+    {
       "source": "tests/test_health.py",
       "target": "app/main.py"
     },
@@ -415,10 +434,12 @@
   ],
   "external_dependencies_summary": {
     "stdlib": [
+      "base64",
       "contextlib.asynccontextmanager",
       "contextvars.ContextVar",
       "datetime.datetime",
       "datetime.timedelta",
+      "datetime.timezone",
       "http.client",
       "logging",
       "os",
@@ -439,8 +460,12 @@
       "urllib.parse.urlencode"
     ],
     "third-party": [
+      "cryptography.exceptions.InvalidTag",
       "cryptography.hazmat.backends.default_backend",
       "cryptography.hazmat.primitives.asymmetric.rsa",
+      "cryptography.hazmat.primitives.ciphers.Cipher",
+      "cryptography.hazmat.primitives.ciphers.algorithms",
+      "cryptography.hazmat.primitives.ciphers.modes",
       "cryptography.hazmat.primitives.serialization",
       "fastapi.APIRouter",
       "fastapi.Depends",
@@ -468,7 +493,7 @@
       "pythonjsonlogger.jsonlogger",
       "uvicorn"
     ],
-    "stdlib_count": 22,
-    "third-party_count": 28
+    "stdlib_count": 24,
+    "third-party_count": 32
   }
 }

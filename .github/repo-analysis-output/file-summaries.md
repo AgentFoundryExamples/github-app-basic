@@ -20,8 +20,8 @@ Total files: 21
 **Role:** configuration  
 **Role Justification:** configuration file name 'config'  
 **Summary:** Python configuration file (role: configuration)  
-**Size:** 6.44 KB  
-**LOC:** 112  
+**Size:** 8.40 KB  
+**LOC:** 153  
 **TODOs/FIXMEs:** 0  
 
 ## app/dao/__init__.py
@@ -38,8 +38,8 @@ Total files: 21
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for firestore dao  
-**Size:** 6.65 KB  
-**LOC:** 150  
+**Size:** 16.71 KB  
+**LOC:** 359  
 **TODOs/FIXMEs:** 0  
 
 ## app/dependencies/__init__.py
@@ -56,7 +56,7 @@ Total files: 21
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for firestore  
-**Size:** 2.87 KB  
+**Size:** 2.92 KB  
 **LOC:** 51  
 **TODOs/FIXMEs:** 0  
 
@@ -137,8 +137,8 @@ Total files: 21
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for logging  
-**Size:** 3.67 KB  
-**LOC:** 62  
+**Size:** 4.50 KB  
+**LOC:** 84  
 **TODOs/FIXMEs:** 0  
 
 ## healthcheck.py
@@ -164,8 +164,8 @@ Total files: 21
 **Role:** test  
 **Role Justification:** filename starts with 'test_'  
 **Summary:** Python test file (role: test)  
-**Size:** 8.78 KB  
-**LOC:** 118  
+**Size:** 12.30 KB  
+**LOC:** 175  
 **TODOs/FIXMEs:** 0  
 
 ## tests/test_firestore_dao.py
@@ -173,8 +173,8 @@ Total files: 21
 **Role:** test  
 **Role Justification:** filename starts with 'test_'  
 **Summary:** Python test file (role: test)  
-**Size:** 17.23 KB  
-**LOC:** 306  
+**Size:** 39.46 KB  
+**LOC:** 733  
 **TODOs/FIXMEs:** 0  
 
 ## tests/test_health.py

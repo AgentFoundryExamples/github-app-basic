@@ -9,20 +9,22 @@ Includes classification of external dependencies as stdlib vs third-party.
 ## Statistics
 
 - **Total files**: 21
-- **Intra-repo dependencies**: 26
-- **External stdlib dependencies**: 22
-- **External third-party dependencies**: 28
+- **Intra-repo dependencies**: 27
+- **External stdlib dependencies**: 24
+- **External third-party dependencies**: 32
 
 ## External Dependencies
 
 ### Standard Library / Core Modules
 
-Total: 22 unique modules
+Total: 24 unique modules
 
+- `base64`
 - `contextlib.asynccontextmanager`
 - `contextvars.ContextVar`
 - `datetime.datetime`
 - `datetime.timedelta`
+- `datetime.timezone`
 - `http.client`
 - `logging`
 - `os`
@@ -37,16 +39,18 @@ Total: 22 unique modules
 - `typing.Dict`
 - `typing.Optional`
 - `unittest.mock.AsyncMock`
-- `unittest.mock.MagicMock`
-- `unittest.mock.Mock`
-- ... and 2 more (see JSON for full list)
+- ... and 4 more (see JSON for full list)
 
 ### Third-Party Packages
 
-Total: 28 unique packages
+Total: 32 unique packages
 
+- `cryptography.exceptions.InvalidTag`
 - `cryptography.hazmat.backends.default_backend`
 - `cryptography.hazmat.primitives.asymmetric.rsa`
+- `cryptography.hazmat.primitives.ciphers.Cipher`
+- `cryptography.hazmat.primitives.ciphers.algorithms`
+- `cryptography.hazmat.primitives.ciphers.modes`
 - `cryptography.hazmat.primitives.serialization`
 - `fastapi.APIRouter`
 - `fastapi.Depends`
@@ -61,16 +65,12 @@ Total: 28 unique packages
 - `fastapi.status`
 - `fastapi.testclient.TestClient`
 - `google.api_core.exceptions`
-- `google.cloud.firestore`
-- `httpx`
-- `jwt`
-- `pydantic.Field`
-- ... and 8 more (see JSON for full list)
+- ... and 12 more (see JSON for full list)
 
 ## Most Depended Upon Files (Intra-Repo)
 
 - `app/config.py` (8 dependents)
-- `app/utils/logging.py` (6 dependents)
+- `app/utils/logging.py` (7 dependents)
 - `app/main.py` (3 dependents)
 - `app/dao/firestore_dao.py` (2 dependents)
 - `app/services/firestore.py` (2 dependents)
@@ -81,7 +81,7 @@ Total: 28 unique packages
 
 ## Files with Most Dependencies (Intra-Repo)
 
-- `tests/test_firestore_dao.py` (5 dependencies)
+- `tests/test_firestore_dao.py` (6 dependencies)
 - `app/dependencies/firestore.py` (4 dependencies)
 - `app/main.py` (4 dependencies)
 - `app/routes/oauth.py` (3 dependencies)
