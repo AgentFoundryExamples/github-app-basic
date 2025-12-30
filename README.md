@@ -591,17 +591,28 @@ gcloud run services proxy github-app-token-service --region us-central1
 Ensure the Cloud Run service account has Firestore access:
 
 ```bash
-# Get the service account email (usually PROJECT_NUMBER-compute@developer.gserviceaccount.com)
+# Get the service account email
+# Note: If not explicitly set, Cloud Run uses the default compute service account:
+# PROJECT_NUMBER-compute@developer.gserviceaccount.com
 SERVICE_ACCOUNT=$(gcloud run services describe github-app-token-service \
   --region us-central1 \
   --format 'value(spec.template.spec.serviceAccountName)' \
   --project your-gcp-project-id)
+
+# If the command returns empty, use the default compute service account
+if [ -z "$SERVICE_ACCOUNT" ]; then
+  PROJECT_NUMBER=$(gcloud projects describe your-gcp-project-id --format='value(projectNumber)')
+  SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+  echo "Using default compute service account: $SERVICE_ACCOUNT"
+fi
 
 # Grant Firestore access
 gcloud projects add-iam-policy-binding your-gcp-project-id \
   --member="serviceAccount:${SERVICE_ACCOUNT}" \
   --role="roles/datastore.user"
 ```
+
+**Note**: The default compute service account format is `PROJECT_NUMBER-compute@developer.gserviceaccount.com`. For better security, consider creating a dedicated service account with minimal permissions for your Cloud Run service.
 
 ### Viewing Logs
 
@@ -700,8 +711,22 @@ ERROR: The user-provided container failed to start and listen on the port define
 
 1. **Never Use `--allow-unauthenticated`**: Always deploy with `--no-allow-unauthenticated`
 2. **Principle of Least Privilege**: Grant `roles/run.invoker` only to specific users/service accounts
-3. **Rotate Secrets**: Regularly update GitHub credentials via `gcloud run services update`
-4. **Monitor Access**: Review IAM policies and Cloud Audit Logs periodically
+3. **Use Secret Manager for Production**: Instead of environment variables, use Google Secret Manager to store sensitive credentials:
+   ```bash
+   # Create secrets in Secret Manager
+   echo -n "your-app-id" | gcloud secrets create github-app-id --data-file=-
+   
+   # Deploy with secrets mounted from Secret Manager
+   gcloud run deploy github-app-token-service \
+     --set-secrets="GITHUB_APP_ID=github-app-id:latest" \
+     --set-secrets="GITHUB_PRIVATE_KEY=github-private-key:latest" \
+     # ... other flags
+   ```
+   This prevents secrets from appearing in deployment history and audit logs.
+4. **Rotate Secrets**: Regularly update GitHub credentials and create new secret versions
+5. **Monitor Access**: Review IAM policies and Cloud Audit Logs periodically
+6. **Avoid Command-Line Secrets**: Never pass secrets as command-line arguments where they may be logged
+7. **Secure Logging**: Ensure logs don't contain sensitive data. The application uses structured logging that excludes credentials.
 5. **Use Secret Manager**: For production, consider storing secrets in Secret Manager instead of environment variables
 6. **Enable VPC**: For additional security, deploy Cloud Run in a VPC Service Controls perimeter
 

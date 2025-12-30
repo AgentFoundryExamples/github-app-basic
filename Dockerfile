@@ -30,6 +30,7 @@ COPY --from=builder /root/.local /home/appuser/.local
 
 # Copy application code
 COPY --chown=appuser:appuser app/ ./app/
+COPY --chown=appuser:appuser healthcheck.py .
 
 # Switch to non-root user
 USER appuser
@@ -40,16 +41,20 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 # Set PORT environment variable with default fallback
 ENV PORT=8080
 
+# Set the number of workers based on environment variable, defaulting to 2
+# Note: Cloud Run may override this based on container resources
+ENV GUNICORN_WORKERS=2
+
 # Expose port
 EXPOSE 8080
 
-# Health check
+# Health check - uses dedicated script for better reliability
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/healthz').read()" || exit 1
+    CMD python healthcheck.py
 
 # Run gunicorn with uvicorn workers
 CMD gunicorn app.main:app \
-    --workers 1 \
+    --workers ${GUNICORN_WORKERS} \
     --worker-class uvicorn.workers.UvicornWorker \
     --bind 0.0.0.0:${PORT} \
     --access-logfile - \

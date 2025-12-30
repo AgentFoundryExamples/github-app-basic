@@ -45,15 +45,20 @@ deploy: ## Deploy to Cloud Run (requires PROJECT_ID)
 		echo "Error: Please set PROJECT_ID variable (e.g., make deploy PROJECT_ID=my-project)"; \
 		exit 1; \
 	fi
+	@echo "WARNING: Deploying with placeholder GitHub credentials."
+	@echo "The service will start but GitHub integration will not work."
+	@echo "Use 'make deploy-with-secrets' to deploy with real credentials."
 	gcloud run deploy $(SERVICE_NAME) \
 		--image $(FULL_IMAGE_NAME) \
 		--platform managed \
 		--region $(REGION) \
 		--no-allow-unauthenticated \
-		--set-env-vars APP_ENV=prod,GCP_PROJECT_ID=$(PROJECT_ID),REGION=$(REGION) \
-		--set-env-vars GITHUB_APP_ID=placeholder,GITHUB_PRIVATE_KEY=placeholder \
-		--set-env-vars GITHUB_CLIENT_ID=placeholder,GITHUB_CLIENT_SECRET=placeholder \
-		--set-env-vars GITHUB_WEBHOOK_SECRET=placeholder \
+		--set-env-vars="^##^APP_ENV=prod##GCP_PROJECT_ID=$(PROJECT_ID)##REGION=$(REGION)" \
+		--set-env-vars="GITHUB_APP_ID=placeholder" \
+		--set-env-vars="GITHUB_PRIVATE_KEY=placeholder" \
+		--set-env-vars="GITHUB_CLIENT_ID=placeholder" \
+		--set-env-vars="GITHUB_CLIENT_SECRET=placeholder" \
+		--set-env-vars="GITHUB_WEBHOOK_SECRET=placeholder" \
 		--project $(PROJECT_ID)
 
 deploy-with-secrets: ## Deploy to Cloud Run with secrets from environment
@@ -61,8 +66,10 @@ deploy-with-secrets: ## Deploy to Cloud Run with secrets from environment
 		echo "Error: Please set PROJECT_ID variable (e.g., make deploy PROJECT_ID=my-project)"; \
 		exit 1; \
 	fi
-	@if [ -z "$(GITHUB_APP_ID)" ]; then \
-		echo "Error: GITHUB_APP_ID environment variable not set"; \
+	@if [ -z "$(GITHUB_APP_ID)" ] || [ -z "$(GITHUB_PRIVATE_KEY)" ] || [ -z "$(GITHUB_CLIENT_ID)" ] || [ -z "$(GITHUB_CLIENT_SECRET)" ] || [ -z "$(GITHUB_WEBHOOK_SECRET)" ]; then \
+		echo "Error: One or more required GitHub secret environment variables are not set."; \
+		echo "Required: GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_WEBHOOK_SECRET"; \
+		echo "Please source your .env file or export them manually."; \
 		exit 1; \
 	fi
 	gcloud run deploy $(SERVICE_NAME) \
@@ -70,10 +77,12 @@ deploy-with-secrets: ## Deploy to Cloud Run with secrets from environment
 		--platform managed \
 		--region $(REGION) \
 		--no-allow-unauthenticated \
-		--set-env-vars APP_ENV=prod,GCP_PROJECT_ID=$(PROJECT_ID),REGION=$(REGION) \
-		--set-env-vars GITHUB_APP_ID=$(GITHUB_APP_ID),GITHUB_PRIVATE_KEY=$(GITHUB_PRIVATE_KEY) \
-		--set-env-vars GITHUB_CLIENT_ID=$(GITHUB_CLIENT_ID),GITHUB_CLIENT_SECRET=$(GITHUB_CLIENT_SECRET) \
-		--set-env-vars GITHUB_WEBHOOK_SECRET=$(GITHUB_WEBHOOK_SECRET) \
+		--set-env-vars="^##^APP_ENV=prod##GCP_PROJECT_ID=$(PROJECT_ID)##REGION=$(REGION)" \
+		--set-env-vars="GITHUB_APP_ID=$(GITHUB_APP_ID)" \
+		--set-env-vars="GITHUB_PRIVATE_KEY=$(GITHUB_PRIVATE_KEY)" \
+		--set-env-vars="GITHUB_CLIENT_ID=$(GITHUB_CLIENT_ID)" \
+		--set-env-vars="GITHUB_CLIENT_SECRET=$(GITHUB_CLIENT_SECRET)" \
+		--set-env-vars="GITHUB_WEBHOOK_SECRET=$(GITHUB_WEBHOOK_SECRET)" \
 		--project $(PROJECT_ID)
 
 invoke: ## Invoke the deployed Cloud Run service (authenticated)
