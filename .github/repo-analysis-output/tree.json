@@ -113,6 +113,10 @@
             {
               "type": "file",
               "name": "health.py"
+            },
+            {
+              "type": "file",
+              "name": "oauth.py"
             }
           ]
         },
@@ -127,6 +131,10 @@
             {
               "type": "file",
               "name": "firestore.py"
+            },
+            {
+              "type": "file",
+              "name": "github.py"
             }
           ]
         },
@@ -177,6 +185,10 @@
         {
           "type": "file",
           "name": "test_health.py"
+        },
+        {
+          "type": "file",
+          "name": "test_oauth_flow.py"
         }
       ]
     },

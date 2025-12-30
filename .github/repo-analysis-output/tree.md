@@ -24,10 +24,12 @@
     └── firestore.py
   ├── routes
     ├── __init__.py
-    └── health.py
+    ├── health.py
+    └── oauth.py
   ├── services
     ├── __init__.py
-    └── firestore.py
+    ├── firestore.py
+    └── github.py
   ├── utils
     ├── __init__.py
     └── logging.py
@@ -38,7 +40,8 @@
   ├── __init__.py
   ├── test_config.py
   ├── test_firestore_dao.py
-  └── test_health.py
+  ├── test_health.py
+  └── test_oauth_flow.py
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore

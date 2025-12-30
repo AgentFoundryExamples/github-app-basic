@@ -4,7 +4,7 @@ Heuristic summaries of source files based on filenames, extensions, and paths.
 
 Schema Version: 2.0
 
-Total files: 18
+Total files: 21
 
 ## app/__init__.py
 **Language:** Python  
@@ -65,8 +65,8 @@ Total files: 18
 **Role:** entry-point  
 **Role Justification:** common entry point name 'main'  
 **Summary:** Python main entry point (role: entry-point)  
-**Size:** 5.14 KB  
-**LOC:** 104  
+**Size:** 5.19 KB  
+**LOC:** 105  
 **TODOs/FIXMEs:** 1  
 
 ## app/routes/__init__.py
@@ -87,6 +87,15 @@ Total files: 18
 **LOC:** 14  
 **TODOs/FIXMEs:** 0  
 
+## app/routes/oauth.py
+**Language:** Python  
+**Role:** implementation  
+**Role Justification:** general implementation file (default classification)  
+**Summary:** Python module for oauth  
+**Size:** 16.55 KB  
+**LOC:** 425  
+**TODOs/FIXMEs:** 0  
+
 ## app/services/__init__.py
 **Language:** Python  
 **Role:** module-init  
@@ -105,6 +114,15 @@ Total files: 18
 **LOC:** 70  
 **TODOs/FIXMEs:** 0  
 
+## app/services/github.py
+**Language:** Python  
+**Role:** implementation  
+**Role Justification:** general implementation file (default classification)  
+**Summary:** Python module for github  
+**Size:** 12.17 KB  
+**LOC:** 264  
+**TODOs/FIXMEs:** 0  
+
 ## app/utils/__init__.py
 **Language:** Python  
 **Role:** module-init  
@@ -119,8 +137,8 @@ Total files: 18
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for logging  
-**Size:** 3.30 KB  
-**LOC:** 58  
+**Size:** 3.67 KB  
+**LOC:** 62  
 **TODOs/FIXMEs:** 0  
 
 ## healthcheck.py
@@ -166,4 +184,13 @@ Total files: 18
 **Summary:** Python test file (role: test)  
 **Size:** 5.89 KB  
 **LOC:** 103  
+**TODOs/FIXMEs:** 0  
+
+## tests/test_oauth_flow.py
+**Language:** Python  
+**Role:** test  
+**Role Justification:** filename starts with 'test_'  
+**Summary:** Python test file (role: test)  
+**Size:** 23.00 KB  
+**LOC:** 453  
 **TODOs/FIXMEs:** 0  

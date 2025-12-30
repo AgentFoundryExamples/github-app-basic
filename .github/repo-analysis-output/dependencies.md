@@ -8,25 +8,29 @@ Includes classification of external dependencies as stdlib vs third-party.
 
 ## Statistics
 
-- **Total files**: 18
-- **Intra-repo dependencies**: 18
-- **External stdlib dependencies**: 16
-- **External third-party dependencies**: 19
+- **Total files**: 21
+- **Intra-repo dependencies**: 26
+- **External stdlib dependencies**: 21
+- **External third-party dependencies**: 27
 
 ## External Dependencies
 
 ### Standard Library / Core Modules
 
-Total: 16 unique modules
+Total: 21 unique modules
 
 - `contextlib.asynccontextmanager`
 - `contextvars.ContextVar`
+- `datetime.datetime`
+- `datetime.timedelta`
 - `http.client`
 - `logging`
 - `os`
+- `secrets`
 - `sys`
 - `threading`
 - `threading.Lock`
+- `time`
 - `typing.Any`
 - `typing.AsyncIterator`
 - `typing.Dict`
@@ -35,47 +39,55 @@ Total: 16 unique modules
 - `unittest.mock.MagicMock`
 - `unittest.mock.Mock`
 - `unittest.mock.patch`
+- ... and 1 more (see JSON for full list)
 
 ### Third-Party Packages
 
-Total: 19 unique packages
+Total: 27 unique packages
 
+- `cryptography.hazmat.backends.default_backend`
+- `cryptography.hazmat.primitives.asymmetric.rsa`
+- `cryptography.hazmat.primitives.serialization`
 - `fastapi.APIRouter`
 - `fastapi.Depends`
 - `fastapi.FastAPI`
 - `fastapi.HTTPException`
 - `fastapi.Request`
+- `fastapi.Response`
 - `fastapi.middleware.cors.CORSMiddleware`
+- `fastapi.responses.HTMLResponse`
+- `fastapi.responses.RedirectResponse`
 - `fastapi.status`
 - `fastapi.testclient.TestClient`
 - `google.api_core.exceptions`
 - `google.cloud.firestore`
+- `httpx`
+- `jwt`
 - `pydantic.Field`
 - `pydantic.ValidationError`
-- `pydantic.field_validator`
-- `pydantic.model_validator`
-- `pydantic_settings.BaseSettings`
-- `pydantic_settings.SettingsConfigDict`
-- `pytest`
-- `pythonjsonlogger.jsonlogger`
-- `uvicorn`
+- ... and 7 more (see JSON for full list)
 
 ## Most Depended Upon Files (Intra-Repo)
 
-- `app/config.py` (6 dependents)
-- `app/utils/logging.py` (4 dependents)
+- `app/config.py` (8 dependents)
+- `app/utils/logging.py` (6 dependents)
+- `app/main.py` (3 dependents)
 - `app/dao/firestore_dao.py` (2 dependents)
 - `app/services/firestore.py` (2 dependents)
-- `app/main.py` (2 dependents)
+- `app/services/github.py` (2 dependents)
 - `app/routes/health.py` (1 dependents)
+- `app/routes/oauth.py` (1 dependents)
 - `app/dependencies/firestore.py` (1 dependents)
 
 ## Files with Most Dependencies (Intra-Repo)
 
 - `tests/test_firestore_dao.py` (5 dependencies)
 - `app/dependencies/firestore.py` (4 dependencies)
-- `app/main.py` (3 dependencies)
+- `app/main.py` (4 dependencies)
+- `app/routes/oauth.py` (3 dependencies)
+- `tests/test_oauth_flow.py` (3 dependencies)
 - `app/services/firestore.py` (2 dependencies)
 - `tests/test_health.py` (2 dependencies)
 - `app/dao/firestore_dao.py` (1 dependencies)
+- `app/services/github.py` (1 dependencies)
 - `tests/test_config.py` (1 dependencies)

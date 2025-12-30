@@ -119,6 +119,26 @@
       }
     },
     {
+      "id": "app/routes/oauth.py",
+      "path": "app/routes/oauth.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "secrets",
+          "typing.Optional",
+          "urllib.parse.urlencode"
+        ],
+        "third-party": [
+          "fastapi.APIRouter",
+          "fastapi.HTTPException",
+          "fastapi.Request",
+          "fastapi.Response",
+          "fastapi.responses.HTMLResponse",
+          "fastapi.responses.RedirectResponse"
+        ]
+      }
+    },
+    {
       "id": "app/services/__init__.py",
       "path": "app/services/__init__.py",
       "type": "file",
@@ -139,6 +159,28 @@
         "third-party": [
           "google.api_core.exceptions",
           "google.cloud.firestore"
+        ]
+      }
+    },
+    {
+      "id": "app/services/github.py",
+      "path": "app/services/github.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "datetime.datetime",
+          "datetime.timedelta",
+          "secrets",
+          "time",
+          "typing.Any",
+          "typing.Dict",
+          "typing.Optional"
+        ],
+        "third-party": [
+          "cryptography.hazmat.backends.default_backend",
+          "cryptography.hazmat.primitives.serialization",
+          "httpx",
+          "jwt"
         ]
       }
     },
@@ -238,6 +280,29 @@
           "pytest"
         ]
       }
+    },
+    {
+      "id": "tests/test_oauth_flow.py",
+      "path": "tests/test_oauth_flow.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "datetime.datetime",
+          "datetime.timedelta",
+          "time",
+          "unittest.mock.AsyncMock",
+          "unittest.mock.Mock",
+          "unittest.mock.patch"
+        ],
+        "third-party": [
+          "cryptography.hazmat.backends.default_backend",
+          "cryptography.hazmat.primitives.asymmetric.rsa",
+          "cryptography.hazmat.primitives.serialization",
+          "fastapi.testclient.TestClient",
+          "jwt",
+          "pytest"
+        ]
+      }
     }
   ],
   "edges": [
@@ -274,11 +339,31 @@
       "target": "app/routes/health.py"
     },
     {
+      "source": "app/main.py",
+      "target": "app/routes/oauth.py"
+    },
+    {
+      "source": "app/routes/oauth.py",
+      "target": "app/config.py"
+    },
+    {
+      "source": "app/routes/oauth.py",
+      "target": "app/services/github.py"
+    },
+    {
+      "source": "app/routes/oauth.py",
+      "target": "app/utils/logging.py"
+    },
+    {
       "source": "app/services/firestore.py",
       "target": "app/config.py"
     },
     {
       "source": "app/services/firestore.py",
+      "target": "app/utils/logging.py"
+    },
+    {
+      "source": "app/services/github.py",
       "target": "app/utils/logging.py"
     },
     {
@@ -312,18 +397,34 @@
     {
       "source": "tests/test_health.py",
       "target": "app/config.py"
+    },
+    {
+      "source": "tests/test_oauth_flow.py",
+      "target": "app/main.py"
+    },
+    {
+      "source": "tests/test_oauth_flow.py",
+      "target": "app/services/github.py"
+    },
+    {
+      "source": "tests/test_oauth_flow.py",
+      "target": "app/config.py"
     }
   ],
   "external_dependencies_summary": {
     "stdlib": [
       "contextlib.asynccontextmanager",
       "contextvars.ContextVar",
+      "datetime.datetime",
+      "datetime.timedelta",
       "http.client",
       "logging",
       "os",
+      "secrets",
       "sys",
       "threading",
       "threading.Lock",
+      "time",
       "typing.Any",
       "typing.AsyncIterator",
       "typing.Dict",
@@ -331,19 +432,28 @@
       "unittest.mock.AsyncMock",
       "unittest.mock.MagicMock",
       "unittest.mock.Mock",
-      "unittest.mock.patch"
+      "unittest.mock.patch",
+      "urllib.parse.urlencode"
     ],
     "third-party": [
+      "cryptography.hazmat.backends.default_backend",
+      "cryptography.hazmat.primitives.asymmetric.rsa",
+      "cryptography.hazmat.primitives.serialization",
       "fastapi.APIRouter",
       "fastapi.Depends",
       "fastapi.FastAPI",
       "fastapi.HTTPException",
       "fastapi.Request",
+      "fastapi.Response",
       "fastapi.middleware.cors.CORSMiddleware",
+      "fastapi.responses.HTMLResponse",
+      "fastapi.responses.RedirectResponse",
       "fastapi.status",
       "fastapi.testclient.TestClient",
       "google.api_core.exceptions",
       "google.cloud.firestore",
+      "httpx",
+      "jwt",
       "pydantic.Field",
       "pydantic.ValidationError",
       "pydantic.field_validator",
@@ -354,7 +464,7 @@
       "pythonjsonlogger.jsonlogger",
       "uvicorn"
     ],
-    "stdlib_count": 16,
-    "third-party_count": 19
+    "stdlib_count": 21,
+    "third-party_count": 27
   }
 }
