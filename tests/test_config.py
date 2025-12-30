@@ -41,9 +41,8 @@ class TestSettings:
         """Test that dev environment does not require GitHub fields."""
         monkeypatch.setenv("APP_ENV", "dev")
         
+        # Should not raise - validation happens automatically in Settings()
         settings = Settings(_env_file=None)
-        # Should not raise
-        settings.validate_production_settings()
         assert settings.app_env == "dev"
     
     def test_region_defaults_to_us_central(self, monkeypatch):
@@ -55,12 +54,9 @@ class TestSettings:
     
     def test_production_validation_with_missing_fields(self):
         """Test that production validation detects missing GitHub fields."""
-        # Create a settings instance directly with prod env
-        settings = Settings(_env_file=None, app_env="prod")
-        
-        # Should raise because GitHub fields are not set
+        # Should raise during Settings instantiation because GitHub fields are not set
         with pytest.raises(ValueError, match="Production environment requires"):
-            settings.validate_production_settings()
+            Settings(_env_file=None, app_env="prod")
     
     def test_production_validation_with_all_required_fields(self, monkeypatch):
         """Test that production validation passes with all required fields."""
@@ -71,9 +67,8 @@ class TestSettings:
         monkeypatch.setenv("GITHUB_CLIENT_SECRET", "secret123")
         monkeypatch.setenv("GITHUB_OAUTH_REDIRECT_URI", "https://example.com/callback")
         
+        # Should not raise - validation happens automatically
         settings = Settings(_env_file=None)
-        # Should not raise
-        settings.validate_production_settings()
         
         assert settings.github_app_id == "123456"
         assert "BEGIN RSA PRIVATE KEY" in settings.github_app_private_key_pem
@@ -93,8 +88,8 @@ class TestSettings:
         monkeypatch.setenv("GITHUB_OAUTH_REDIRECT_URI", "https://example.com/callback")
         
         with caplog.at_level(logging.WARNING):
+            # Validation happens automatically during instantiation
             settings = Settings(_env_file=None)
-            settings.validate_production_settings()
         
         # Check that warning was logged
         assert any("GITHUB_WEBHOOK_SECRET" in record.message for record in caplog.records)
@@ -155,6 +150,15 @@ MIIEpAIBAAKCAQEA1234
         with pytest.raises(ValueError, match="must end with a PEM footer"):
             Settings(_env_file=None)
     
+    def test_pem_key_ends_with_dashes_but_no_end_marker_raises_error(self, monkeypatch):
+        """Test that PEM key ending with dashes but missing END marker raises validation error."""
+        # This key ends with ----- but doesn't have -----END marker
+        pem_key = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA1234\nsome more content-----"
+        monkeypatch.setenv("GITHUB_APP_PRIVATE_KEY_PEM", pem_key)
+        
+        with pytest.raises(ValueError, match="must end with a PEM footer"):
+            Settings(_env_file=None)
+    
     def test_pem_key_empty_after_strip_becomes_none(self, monkeypatch):
         """Test that empty PEM key after stripping becomes None."""
         monkeypatch.setenv("GITHUB_APP_PRIVATE_KEY_PEM", "   ")
@@ -171,7 +175,6 @@ MIIEpAIBAAKCAQEA1234
         monkeypatch.setenv("GITHUB_CLIENT_SECRET", "secret123")
         # Intentionally omit GITHUB_OAUTH_REDIRECT_URI
         
-        settings = Settings(_env_file=None)
-        
+        # Should raise during instantiation due to missing field
         with pytest.raises(ValueError, match="GITHUB_OAUTH_REDIRECT_URI"):
-            settings.validate_production_settings()
+            Settings(_env_file=None)

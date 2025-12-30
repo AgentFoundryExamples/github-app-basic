@@ -15,7 +15,7 @@
 
 import logging
 from typing import Optional
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,7 @@ class Settings(BaseSettings):
                 "Ensure the key is properly formatted and includes the BEGIN/END markers."
             )
         
-        if not v.endswith('-----'):
+        if not v.endswith('-----') or '-----END' not in v:
             raise ValueError(
                 "GITHUB_APP_PRIVATE_KEY_PEM must end with a PEM footer (e.g., '-----END RSA PRIVATE KEY-----'). "
                 "Ensure the key is properly formatted and includes the BEGIN/END markers."
@@ -115,14 +115,15 @@ class Settings(BaseSettings):
         
         return v
     
-    def validate_production_settings(self) -> None:
+    @model_validator(mode='after')
+    def validate_production_settings(self) -> "Settings":
         """Validate that required settings are present for production.
         
         Raises:
             ValueError: If required production settings are missing.
         """
         if self.app_env != "prod":
-            return
+            return self
         
         # Required fields for production (webhook_secret is optional)
         required_fields = {
@@ -150,6 +151,7 @@ class Settings(BaseSettings):
                 "GITHUB_WEBHOOK_SECRET is not set. Webhook validation will not be available. "
                 "This is acceptable for development but should be configured for production webhook endpoints."
             )
+        return self
 
 
 def get_settings() -> Settings:
@@ -161,6 +163,4 @@ def get_settings() -> Settings:
     Raises:
         ValueError: If production validation fails.
     """
-    settings = Settings()
-    settings.validate_production_settings()
-    return settings
+    return Settings()
