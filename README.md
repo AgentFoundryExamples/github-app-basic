@@ -261,7 +261,7 @@ The service stores GitHub OAuth tokens securely in Firestore with encryption. Th
 **Example Document (in Firestore):**
 ```json
 {
-  "access_token": "WyRQmxK7pN...encrypted_base64_string...fJ2Kp1Qx==",
+  "access_token": "WyRQmxK7pNjM3kL2pHqR8vS9wT0uA1bC2dE3fF4gG5hH6iI7jJ8kK9lL0mM1nN2oO3pP4qQ5rR6sS7tT8uU9vV0wW1xX2yY3zZ4aA5bB6cC7dD8eE9fF0gG1hH2iI3jJ4kK5lL==",
   "token_type": "bearer",
   "scope": "repo,user:email,read:org",
   "expires_at": null,
@@ -354,7 +354,7 @@ To rotate the encryption key, you must re-encrypt all stored tokens with the new
    ```
 
 5. **Re-run the OAuth flow** to store a new token encrypted with the new key:
-   - Navigate to `https://your-service.run.app/github/install`
+   - Navigate to `https://<your-service-name>.run.app/github/install`
    - Complete the GitHub authorization flow
    - New token will be encrypted with the new key
 
@@ -386,11 +386,11 @@ To access Firestore, the Cloud Run service account must have appropriate IAM rol
    SERVICE_ACCOUNT=$(gcloud run services describe github-app-token-service \
      --region us-central1 \
      --format 'value(spec.template.spec.serviceAccountName)' \
-     --project your-gcp-project-id)
+     --project $PROJECT_ID)
    
    # If empty, Cloud Run uses the default compute service account
    if [ -z "$SERVICE_ACCOUNT" ]; then
-     PROJECT_NUMBER=$(gcloud projects describe your-gcp-project-id --format='value(projectNumber)')
+     PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
      SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
      echo "Using default compute service account: $SERVICE_ACCOUNT"
    fi
@@ -398,14 +398,14 @@ To access Firestore, the Cloud Run service account must have appropriate IAM rol
 
 2. **Grant Firestore access:**
    ```bash
-   gcloud projects add-iam-policy-binding your-gcp-project-id \
+   gcloud projects add-iam-policy-binding $PROJECT_ID \
      --member="serviceAccount:${SERVICE_ACCOUNT}" \
      --role="roles/datastore.user"
    ```
 
 3. **Verify IAM permissions:**
    ```bash
-   gcloud projects get-iam-policy your-gcp-project-id \
+   gcloud projects get-iam-policy $PROJECT_ID \
      --flatten="bindings[].members" \
      --format="table(bindings.role)" \
      --filter="bindings.members:serviceAccount:${SERVICE_ACCOUNT}"
@@ -467,7 +467,7 @@ curl http://localhost:8080/admin/token-metadata
   "token_type": "bearer",
   "scope": "repo,user:email,read:org",
   "expires_at": null,
-  "has_refresh_token": false,
+  "has_refresh_token": true,
   "updated_at": "2025-12-30T19:00:00.000000+00:00"
 }
 ```
