@@ -941,6 +941,86 @@ Browser clients should never call this endpoint directly.
 
 **See:** [Troubleshooting OAuth Issues](#troubleshooting-oauth-issues) for common error scenarios and solutions.
 
+### Token Retrieval Endpoint
+```
+POST /api/token
+```
+Retrieves the stored GitHub user access token, automatically refreshing if near expiration or when explicitly requested.
+
+**⚠️ IAM Authentication Required:** This endpoint is protected by Cloud Run IAM authentication. Callers must have the `roles/run.invoker` permission and provide a valid identity token.
+
+**Authentication:**
+- Requires Cloud Run IAM authentication at infrastructure level
+- No application-level authentication is performed
+- Deploy with: `gcloud run deploy --no-allow-unauthenticated`
+- Callers must obtain identity tokens via `gcloud auth print-identity-token` or GCP client libraries
+
+**Request:**
+- **Method:** POST
+- **Content-Type:** application/json (optional)
+- **Headers:**
+  - `Authorization: Bearer <identity-token>` (required for Cloud Run IAM)
+  - `Content-Type: application/json` (optional, only if sending request body)
+
+**Request Body (Optional):**
+```json
+{
+  "force_refresh": false
+}
+```
+
+**Query Parameters (Optional):**
+- `force_refresh` (boolean): Force token refresh even if not near expiry. Default: `false`
+
+**Response (200 OK):**
+```json
+{
+  "access_token": "gho_ExampleToken123...",
+  "token_type": "bearer",
+  "expires_at": "2025-12-31T23:59:59+00:00"
+}
+```
+
+**Response Fields:**
+- `access_token` (string): GitHub user access token for API calls
+- `token_type` (string): Token type, typically "bearer"
+- `expires_at` (string or null): ISO-8601 timestamp of expiration, or `null` for non-expiring tokens
+
+**Error Responses:**
+
+| Status Code | Condition | Response Body |
+|-------------|-----------|---------------|
+| 404 Not Found | User has not completed OAuth authorization | `{"detail": "User has not completed authorization"}` |
+| 500 Internal Server Error | Token refresh failed due to GitHub API error | `{"detail": "Failed to refresh GitHub token"}` |
+| 503 Service Unavailable | Firestore service temporarily unavailable | `{"detail": "Firestore service is temporarily unavailable"}` |
+
+**Token Refresh Behavior:**
+
+The endpoint automatically refreshes tokens when:
+1. **Near Expiration:** Token expiration is within configured threshold (default: 30 minutes)
+2. **Force Refresh:** `force_refresh=true` is explicitly requested
+3. **Non-Expiring Tokens:** Tokens with `expires_at=null` are only refreshed when `force_refresh=true`
+
+**Cooldown Protection:**
+- After a failed refresh attempt, a cooldown period prevents excessive API calls (default: 300 seconds)
+- During cooldown, refresh attempts are blocked and the current token is returned
+- `force_refresh=true` bypasses cooldown for administrative operations
+- Cooldown is tracked in Firestore via `last_refresh_attempt` timestamp
+
+**⚠️ Security Considerations:**
+- Never log or print the `access_token` to stdout, logs, or error messages
+- Use the token only for authorized GitHub API calls
+- Store identity tokens securely when calling from external services
+- Avoid unnecessary `force_refresh` requests to prevent cooldown activation
+
+**Usage Examples:**
+
+See [Calling POST /api/token from Platform Services](#calling-post-apitoken-from-platform-services) for detailed examples including:
+- Cloud Run service-to-service calls
+- Cloud Functions invocation
+- Cloud Scheduler job configuration
+- Python helper code for identity token acquisition
+
 ### OpenAPI Documentation
 ```
 GET /docs
@@ -1272,6 +1352,614 @@ You may need to regenerate OAuth credentials if they're compromised or as part o
 - Implementing automatic token refresh logic for tokens with expiration
 - Setting up proper CORS policies for frontend applications
 - Using OAuth state parameter for deep linking after authentication
+
+## Calling POST /api/token from Platform Services
+
+This section explains how to call the `POST /api/token` endpoint from various GCP platform services using Cloud Run IAM authentication with identity tokens.
+
+### Prerequisites
+
+Before calling the token endpoint, ensure:
+
+1. **IAM Permissions:** The calling service or user has `roles/run.invoker` on the Cloud Run service
+2. **Service URL:** You have the full Cloud Run service URL (e.g., `https://github-app-token-service-xxxxx-uc.a.run.app`)
+3. **Regional URL:** For proper identity token audience, use the regional service URL (not custom domains)
+
+### IAM Setup: Granting roles/run.invoker
+
+The `roles/run.invoker` role allows a service account or user to invoke a Cloud Run service.
+
+#### Grant Access to a User
+
+```bash
+# Grant access to a specific user
+gcloud run services add-iam-policy-binding github-app-token-service \
+  --region us-central1 \
+  --member='user:alice@example.com' \
+  --role='roles/run.invoker' \
+  --project your-gcp-project-id
+```
+
+#### Grant Access to a Service Account
+
+```bash
+# Grant access to a service account (for Cloud Run, Cloud Functions, Cloud Scheduler)
+gcloud run services add-iam-policy-binding github-app-token-service \
+  --region us-central1 \
+  --member='serviceAccount:my-service@project-id.iam.gserviceaccount.com' \
+  --role='roles/run.invoker' \
+  --project your-gcp-project-id
+```
+
+#### Verify IAM Permissions
+
+```bash
+# List all members with run.invoker role
+gcloud run services get-iam-policy github-app-token-service \
+  --region us-central1 \
+  --project your-gcp-project-id
+```
+
+### Cloud Run to Cloud Run Invocation
+
+When calling from one Cloud Run service to another, use Google's authentication libraries to obtain an identity token.
+
+#### Python Example
+
+```python
+import google.auth
+import google.auth.transport.requests
+import google.oauth2.id_token
+import requests
+import json
+
+# Service URL - use the regional Cloud Run URL
+SERVICE_URL = "https://github-app-token-service-xxxxx-uc.a.run.app"
+
+def get_github_token(force_refresh: bool = False) -> dict:
+    """
+    Get GitHub access token from the token service.
+    
+    Args:
+        force_refresh: Force token refresh even if not near expiry
+        
+    Returns:
+        dict with 'access_token', 'token_type', 'expires_at'
+        
+    Raises:
+        requests.HTTPError: If request fails (404, 500, 503)
+    """
+    # Obtain identity token for service-to-service auth
+    # This works for both service accounts on GCP and user credentials
+    # via Application Default Credentials (ADC).
+    import google.auth.transport.requests
+    import google.oauth2.id_token
+    
+    try:
+        auth_req = google.auth.transport.requests.Request()
+        
+        # fetch_id_token will use the credentials from google.auth.default()
+        # to generate an identity token with the target service URL as audience.
+        id_token = google.oauth2.id_token.fetch_id_token(auth_req, SERVICE_URL)
+        
+    except google.auth.exceptions.DefaultCredentialsError as e:
+        raise Exception(
+            "Could not find default credentials. "
+            "Please run 'gcloud auth application-default login' or "
+            "set up service account credentials."
+        ) from e
+    
+    # Make authenticated request to token endpoint
+    headers = {
+        "Authorization": f"Bearer {id_token}",
+        "Content-Type": "application/json"
+    }
+    
+    # Optional: Include force_refresh in request body or query param
+    data = {"force_refresh": force_refresh}
+    
+    response = requests.post(
+        f"{SERVICE_URL}/api/token",
+        headers=headers,
+        json=data,
+        timeout=30
+    )
+    
+    # Raise exception for error responses
+    response.raise_for_status()
+    
+    # Parse response
+    token_data = response.json()
+    
+    # SECURITY: Never log or print the access_token
+    # Only log metadata for debugging
+    print(f"Token retrieved: type={token_data['token_type']}, "
+          f"expires_at={token_data.get('expires_at', 'never')}")
+    
+    return token_data
+
+# Usage example
+try:
+    token_response = get_github_token(force_refresh=False)
+    github_token = token_response["access_token"]
+    
+    # Use the GitHub token for API calls
+    github_headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+    
+    # Example: Get authenticated user
+    github_response = requests.get(
+        "https://api.github.com/user",
+        headers=github_headers
+    )
+    github_response.raise_for_status()
+    print(f"Authenticated as: {github_response.json()['login']}")
+    
+except requests.HTTPError as e:
+    if e.response.status_code == 404:
+        print("ERROR: OAuth authorization not completed")
+    elif e.response.status_code == 500:
+        print("ERROR: Token refresh failed")
+    elif e.response.status_code == 503:
+        print("ERROR: Firestore service unavailable")
+    else:
+        print(f"ERROR: Unexpected error: {e}")
+```
+
+#### Node.js Example
+
+```javascript
+const { GoogleAuth } = require('google-auth-library');
+const axios = require('axios');
+
+const SERVICE_URL = 'https://github-app-token-service-xxxxx-uc.a.run.app';
+
+async function getGitHubToken(forceRefresh = false) {
+  // Create GoogleAuth client
+  const auth = new GoogleAuth();
+  
+  // Get identity token client for the target service
+  // The client is automatically configured with SERVICE_URL as the audience
+  const client = await auth.getIdTokenClient(SERVICE_URL);
+  
+  // Get the identity token from the configured client
+  const idToken = await client.idTokenProvider.fetchIdToken(SERVICE_URL);
+  
+  // Alternative simpler approach (recommended):
+  // const headers = await client.getRequestHeaders();
+  // const idToken = headers['Authorization'].replace('Bearer ', '');
+  
+  // Call token endpoint
+  const response = await axios.post(
+    `${SERVICE_URL}/api/token`,
+    { force_refresh: forceRefresh },
+    {
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 30000
+    }
+  );
+  
+  // SECURITY: Never log the access_token
+  console.log(`Token retrieved: type=${response.data.token_type}, expires_at=${response.data.expires_at || 'never'}`);
+  
+  return response.data;
+}
+
+// Usage
+(async () => {
+  try {
+    const tokenData = await getGitHubToken(false);
+    const githubToken = tokenData.access_token;
+    
+    // Use the GitHub token for API calls
+    const githubResponse = await axios.get('https://api.github.com/user', {
+      headers: {
+        'Authorization': `Bearer ${githubToken}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      }
+    });
+    
+    console.log(`Authenticated as: ${githubResponse.data.login}`);
+  } catch (error) {
+    if (error.response?.status === 404) {
+      console.error('ERROR: OAuth authorization not completed');
+    } else if (error.response?.status === 500) {
+      console.error('ERROR: Token refresh failed');
+    } else if (error.response?.status === 503) {
+      console.error('ERROR: Firestore service unavailable');
+    } else {
+      console.error(`ERROR: ${error.message}`);
+    }
+  }
+})();
+```
+
+### Cloud Functions Invocation
+
+Cloud Functions can call the token endpoint using the same approach as Cloud Run services.
+
+#### Python Cloud Function Example
+
+```python
+import functions_framework
+import google.auth.transport.requests
+import google.oauth2.id_token
+import requests
+
+SERVICE_URL = "https://github-app-token-service-xxxxx-uc.a.run.app"
+
+@functions_framework.http
+def get_github_repos(request):
+    """
+    Cloud Function that retrieves GitHub repositories for the authenticated user.
+    """
+    try:
+        # Get identity token with the correct audience for the target service
+        auth_req = google.auth.transport.requests.Request()
+        id_token = google.oauth2.id_token.fetch_id_token(auth_req, SERVICE_URL)
+        
+        # Call token endpoint
+        token_response = requests.post(
+            f"{SERVICE_URL}/api/token",
+            headers={"Authorization": f"Bearer {id_token}"},
+            json={"force_refresh": False},
+            timeout=30
+        )
+        token_response.raise_for_status()
+        token_data = token_response.json()
+        
+        # Use GitHub token to fetch repositories
+        github_response = requests.get(
+            "https://api.github.com/user/repos",
+            headers={
+                "Authorization": f"Bearer {token_data['access_token']}",
+                "Accept": "application/vnd.github+json"
+            },
+            timeout=30
+        )
+        github_response.raise_for_status()
+        repos = github_response.json()
+        
+        return {"repos": [r["full_name"] for r in repos]}, 200
+        
+    except requests.HTTPError as e:
+        return {"error": f"HTTP error: {e.response.status_code}"}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500
+```
+
+**Deployment:**
+
+```bash
+# Deploy Cloud Function with necessary IAM permissions
+gcloud functions deploy get-github-repos \
+  --runtime python311 \
+  --trigger-http \
+  --entry-point get_github_repos \
+  --region us-central1 \
+  --project your-gcp-project-id
+
+# Grant the function's service account access to the token service
+FUNCTION_SA=$(gcloud functions describe get-github-repos \
+  --region us-central1 \
+  --format='value(serviceAccountEmail)' \
+  --project your-gcp-project-id)
+
+gcloud run services add-iam-policy-binding github-app-token-service \
+  --region us-central1 \
+  --member="serviceAccount:${FUNCTION_SA}" \
+  --role='roles/run.invoker' \
+  --project your-gcp-project-id
+```
+
+### Cloud Scheduler Job Configuration
+
+Cloud Scheduler can invoke the token endpoint on a schedule using HTTP targets.
+
+#### Creating a Scheduler Job
+
+```bash
+# Create a scheduler job that calls the token endpoint every hour
+gcloud scheduler jobs create http github-token-refresh \
+  --schedule="0 * * * *" \
+  --uri="https://github-app-token-service-xxxxx-uc.a.run.app/api/token" \
+  --http-method=POST \
+  --oidc-service-account-email=scheduler-sa@your-gcp-project-id.iam.gserviceaccount.com \
+  --oidc-token-audience="https://github-app-token-service-xxxxx-uc.a.run.app" \
+  --headers="Content-Type=application/json" \
+  --message-body='{"force_refresh": false}' \
+  --location=us-central1 \
+  --project your-gcp-project-id
+
+# Grant the scheduler service account access to the token service
+gcloud run services add-iam-policy-binding github-app-token-service \
+  --region us-central1 \
+  --member="serviceAccount:scheduler-sa@your-gcp-project-id.iam.gserviceaccount.com" \
+  --role='roles/run.invoker' \
+  --project your-gcp-project-id
+```
+
+**Important Notes:**
+- `--oidc-service-account-email`: Service account that Cloud Scheduler uses for authentication
+- `--oidc-token-audience`: Must match the Cloud Run service URL for proper identity token validation
+- `--message-body`: JSON body with optional `force_refresh` parameter
+
+#### Viewing Scheduler Job Logs
+
+```bash
+# View logs for the scheduler job
+gcloud logging read "resource.type=cloud_scheduler_job AND resource.labels.job_id=github-token-refresh" \
+  --limit 50 \
+  --format json \
+  --project your-gcp-project-id
+```
+
+### Using curl with Identity Tokens
+
+For manual testing or scripts, use `gcloud auth print-identity-token` to obtain an identity token.
+
+#### Basic curl Request
+
+```bash
+# Get identity token for your user account
+IDENTITY_TOKEN=$(gcloud auth print-identity-token)
+
+# Get service URL
+SERVICE_URL="https://github-app-token-service-xxxxx-uc.a.run.app"
+
+# Call the token endpoint
+curl -X POST "${SERVICE_URL}/api/token" \
+  -H "Authorization: Bearer ${IDENTITY_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"force_refresh": false}'
+```
+
+#### With Query Parameter
+
+```bash
+# Using query parameter instead of request body
+curl -X POST "${SERVICE_URL}/api/token?force_refresh=true" \
+  -H "Authorization: Bearer ${IDENTITY_TOKEN}"
+```
+
+#### Parsing Response with jq
+
+```bash
+# Extract access_token from response (for use in scripts)
+GITHUB_TOKEN=$(curl -s -X POST "${SERVICE_URL}/api/token" \
+  -H "Authorization: Bearer ${IDENTITY_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"force_refresh": false}' | jq -r '.access_token')
+
+# SECURITY WARNING: Never echo or log the token value
+# Use it directly for GitHub API calls
+
+# Example: Use the token to call GitHub API
+curl -s "https://api.github.com/user" \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "Accept: application/vnd.github+json" | jq '.login'
+```
+
+### Error Handling and Response Codes
+
+When calling POST /api/token, handle the following HTTP status codes:
+
+| Status Code | Meaning | Action |
+|-------------|---------|--------|
+| 200 OK | Token retrieved successfully (may have been refreshed) | Use `access_token` from response |
+| 404 Not Found | User has not completed OAuth authorization | Direct user to complete OAuth flow via `/github/install` |
+| 500 Internal Server Error | Token refresh failed due to GitHub API error | Retry after cooldown period (default: 300 seconds) |
+| 503 Service Unavailable | Firestore service temporarily unavailable | Retry with exponential backoff |
+
+#### Python Error Handling Example
+
+```python
+import time
+import requests
+
+def get_github_token_with_retry(
+    service_url: str,
+    identity_token: str,
+    force_refresh: bool = False,
+    max_retries: int = 3
+) -> dict:
+    """
+    Get GitHub token with retry logic for transient errors.
+    
+    Args:
+        service_url: Cloud Run service URL
+        identity_token: GCP identity token
+        force_refresh: Force token refresh
+        max_retries: Maximum number of retry attempts
+        
+    Returns:
+        Token data dict
+        
+    Raises:
+        Exception: If all retries exhausted or non-retryable error
+    """
+    retry_delay = 1  # Start with 1 second
+    
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                f"{service_url}/api/token",
+                headers={
+                    "Authorization": f"Bearer {identity_token}",
+                    "Content-Type": "application/json"
+                },
+                json={"force_refresh": force_refresh},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 404:
+                # Non-retryable: User needs to complete OAuth
+                raise Exception("OAuth authorization not completed. Visit /github/install")
+            elif response.status_code == 500:
+                # Retryable: Token refresh failed, may be in cooldown
+                if attempt < max_retries - 1:
+                    print(f"Token refresh failed, retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+                else:
+                    raise Exception("Token refresh failed after max retries")
+            elif response.status_code == 503:
+                # Retryable: Firestore unavailable
+                if attempt < max_retries - 1:
+                    print(f"Service unavailable, retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    raise Exception("Service unavailable after max retries")
+            else:
+                raise Exception(f"Unexpected status code: {response.status_code}")
+                
+        except requests.RequestException as e:
+            if attempt < max_retries - 1:
+                print(f"Request failed: {e}, retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+                retry_delay *= 2
+                continue
+            else:
+                raise Exception(f"Request failed after max retries: {e}")
+```
+
+### Understanding Token Expiration and force_refresh
+
+#### Non-Expiring Tokens
+
+GitHub user-to-server tokens typically do not expire (`expires_at: null`). For these tokens:
+
+- **Automatic Refresh:** Never triggered automatically (since no expiration date)
+- **Manual Refresh:** Only via `force_refresh=true`
+- **Use Case:** Administrative operations, manual token rotation, or testing
+
+#### Tokens with Expiration
+
+For tokens with an expiration date:
+
+- **Automatic Refresh:** Triggered when expiration is within threshold (default: 30 minutes)
+- **Threshold:** Configurable via `TOKEN_REFRESH_THRESHOLD_MINUTES` environment variable
+- **Manual Refresh:** Can be forced with `force_refresh=true` even if not near expiry
+
+#### When to Use force_refresh
+
+| Scenario | Use force_refresh | Reason |
+|----------|-------------------|--------|
+| Regular API calls | ❌ No | Let automatic refresh handle it |
+| Token near expiry | ❌ No | Automatically refreshed |
+| Manual token rotation | ✅ Yes | Proactive security measure |
+| Testing refresh logic | ✅ Yes | Verify refresh workflow |
+| After IAM changes | ✅ Yes | Ensure token is current |
+| Debugging auth issues | ✅ Yes | Get fresh token |
+
+#### Cooldown Behavior
+
+After a failed refresh attempt, a cooldown period prevents excessive GitHub API calls:
+
+- **Default Cooldown:** 300 seconds (5 minutes)
+- **Configuration:** Set via `TOKEN_REFRESH_COOLDOWN_SECONDS` environment variable
+- **Bypass:** `force_refresh=true` bypasses cooldown for administrative operations
+- **Tracking:** Last refresh attempt timestamp stored in Firestore
+
+**Cooldown Example:**
+```
+12:00:00 - Token refresh fails (GitHub API error)
+12:00:01 - Cooldown activated (300 seconds)
+12:02:00 - Regular refresh blocked (still in cooldown)
+12:02:00 - Returns current token with warning log
+12:05:01 - Cooldown expires
+12:05:02 - Regular refresh allowed again
+```
+
+**Force Refresh Bypass:**
+```
+12:00:00 - Token refresh fails (GitHub API error)
+12:00:01 - Cooldown activated (300 seconds)
+12:02:00 - force_refresh=true request
+12:02:00 - Cooldown bypassed, refresh attempted
+12:02:01 - New token returned (if successful)
+```
+
+### Best Practices
+
+1. **Use Regional URLs:** Always use the regional Cloud Run URL (not custom domains) as the identity token audience
+2. **Never Log Tokens:** The `access_token` should never be printed to logs, stdout, or error messages
+3. **Handle All Status Codes:** Implement proper error handling for 404, 500, and 503 responses
+4. **Retry with Backoff:** Use exponential backoff for 500 and 503 errors
+5. **Respect Cooldown:** Don't use `force_refresh=true` unnecessarily to avoid cooldown activation
+6. **Cache Tokens:** Cache the GitHub token in your service to avoid unnecessary calls to the token endpoint
+7. **Token Expiration:** Check `expires_at` field and proactively refresh before expiration
+8. **Monitor Failures:** Set up alerts for repeated 500 errors indicating refresh failures
+9. **IAM Auditing:** Regularly review who has `roles/run.invoker` on the token service
+10. **Secure Transport:** All calls use HTTPS; never transmit tokens over unencrypted connections
+
+### Troubleshooting
+
+#### Identity Token Invalid
+
+**Error:** 401 Unauthorized or 403 Forbidden
+
+**Causes:**
+- Identity token expired (tokens have short lifetime, typically 1 hour)
+- Wrong audience specified in identity token
+- Missing `roles/run.invoker` permission
+
+**Solutions:**
+```bash
+# Verify IAM permissions
+gcloud run services get-iam-policy github-app-token-service \
+  --region us-central1 \
+  --project your-gcp-project-id
+
+# Regenerate identity token
+IDENTITY_TOKEN=$(gcloud auth print-identity-token)
+
+# For service accounts, ensure correct audience is used
+# Python: Use google.oauth2.id_token.fetch_id_token(auth_req, service_url)
+# Node.js: Use GoogleAuth.getIdTokenClient(serviceUrl)
+```
+
+#### Token Refresh Cooldown
+
+**Error:** Token refresh blocked, current token returned
+
+**Cause:** Recent failed refresh attempt triggered cooldown period
+
+**Solutions:**
+- Wait for cooldown period to expire (default: 300 seconds)
+- Use `force_refresh=true` to bypass cooldown (for admin operations only)
+- Check logs for root cause of refresh failure
+
+#### Firestore Permission Denied
+
+**Error:** 503 Service Unavailable with "Firestore service is temporarily unavailable"
+
+**Cause:** Cloud Run service account lacks Firestore IAM permissions
+
+**Solution:**
+```bash
+# Grant Firestore access to Cloud Run service account
+SERVICE_ACCOUNT=$(gcloud run services describe github-app-token-service \
+  --region us-central1 \
+  --format 'value(spec.template.spec.serviceAccountName)' \
+  --project your-gcp-project-id)
+
+gcloud projects add-iam-policy-binding your-gcp-project-id \
+  --member="serviceAccount:${SERVICE_ACCOUNT}" \
+  --role="roles/datastore.user"
+```
 
 ## Testing
 
@@ -1624,18 +2312,16 @@ gcloud run services add-iam-policy-binding github-app-token-service \
 For Cloud Functions, Cloud Run, or other GCP services calling this service:
 
 ```python
-import google.auth
 import google.auth.transport.requests
+import google.oauth2.id_token
 import requests
 
 # Get the service URL
 SERVICE_URL = "https://github-app-token-service-xxxxx-uc.a.run.app"
 
-# Obtain ID token
+# Obtain ID token with proper audience
 auth_req = google.auth.transport.requests.Request()
-credentials, project = google.auth.default()
-credentials.refresh(auth_req)
-id_token = credentials.id_token
+id_token = google.oauth2.id_token.fetch_id_token(auth_req, SERVICE_URL)
 
 # Make authenticated request
 response = requests.get(
