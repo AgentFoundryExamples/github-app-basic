@@ -121,9 +121,6 @@ def get_readiness_state() -> ReadinessState:
     """
     global _readiness_state
     
-    if _readiness_state is not None:
-        return _readiness_state
-    
     with _state_lock:
         if _readiness_state is None:
             _readiness_state = ReadinessState()

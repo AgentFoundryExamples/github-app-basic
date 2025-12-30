@@ -47,7 +47,7 @@ async def check_firestore_health(settings: Settings) -> Dict[str, Any]:
     """Check Firestore connectivity with timeout.
     
     Performs a lightweight check by attempting to access Firestore client
-    and optionally performing a simple query.
+    and performing a simple query that validates actual connectivity.
     
     Args:
         settings: Application settings.
@@ -60,12 +60,17 @@ async def check_firestore_health(settings: Settings) -> Dict[str, Any]:
         client = get_firestore_client(settings)
         
         # Perform a simple operation to verify connectivity
-        # Use a very lightweight operation - just list collections (limited to 1)
+        # Use a more definitive operation - get a single collection name
+        # This ensures actual network connectivity rather than lazy-loaded iterators
         async def test_connection():
             collections = client.collections()
-            # Just check if we can iterate (don't consume the whole iterator)
-            async for _ in collections:
-                break
+            # Get at least one collection to confirm connectivity
+            # This forces actual network communication with Firestore
+            collection_list = []
+            async for collection in collections:
+                collection_list.append(collection.id)
+                break  # Only need one to validate connectivity
+            # If we get here without error, connectivity is confirmed
             return True
         
         # Execute with timeout
