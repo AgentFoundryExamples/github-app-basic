@@ -27,6 +27,54 @@
       }
     },
     {
+      "id": "app/dao/__init__.py",
+      "path": "app/dao/__init__.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [],
+        "third-party": []
+      }
+    },
+    {
+      "id": "app/dao/firestore_dao.py",
+      "path": "app/dao/firestore_dao.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "typing.Any",
+          "typing.Dict",
+          "typing.Optional"
+        ],
+        "third-party": [
+          "google.api_core.exceptions",
+          "google.cloud.firestore"
+        ]
+      }
+    },
+    {
+      "id": "app/dependencies/__init__.py",
+      "path": "app/dependencies/__init__.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [],
+        "third-party": []
+      }
+    },
+    {
+      "id": "app/dependencies/firestore.py",
+      "path": "app/dependencies/firestore.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [],
+        "third-party": [
+          "fastapi.Depends",
+          "fastapi.HTTPException",
+          "fastapi.Request",
+          "fastapi.status"
+        ]
+      }
+    },
+    {
       "id": "app/main.py",
       "path": "app/main.py",
       "type": "file",
@@ -65,6 +113,30 @@
         ],
         "third-party": [
           "fastapi.APIRouter"
+        ]
+      }
+    },
+    {
+      "id": "app/services/__init__.py",
+      "path": "app/services/__init__.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [],
+        "third-party": []
+      }
+    },
+    {
+      "id": "app/services/firestore.py",
+      "path": "app/services/firestore.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "threading.Lock",
+          "typing.Optional"
+        ],
+        "third-party": [
+          "google.api_core.exceptions",
+          "google.cloud.firestore"
         ]
       }
     },
@@ -116,6 +188,29 @@
       }
     },
     {
+      "id": "tests/test_firestore_dao.py",
+      "path": "tests/test_firestore_dao.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "threading",
+          "unittest.mock.AsyncMock",
+          "unittest.mock.MagicMock",
+          "unittest.mock.Mock",
+          "unittest.mock.patch"
+        ],
+        "third-party": [
+          "fastapi.APIRouter",
+          "fastapi.Depends",
+          "fastapi.HTTPException",
+          "fastapi.testclient.TestClient",
+          "google.api_core.exceptions",
+          "google.cloud.firestore",
+          "pytest"
+        ]
+      }
+    },
+    {
       "id": "tests/test_health.py",
       "path": "tests/test_health.py",
       "type": "file",
@@ -130,6 +225,26 @@
   ],
   "edges": [
     {
+      "source": "app/dao/firestore_dao.py",
+      "target": "app/utils/logging.py"
+    },
+    {
+      "source": "app/dependencies/firestore.py",
+      "target": "app/config.py"
+    },
+    {
+      "source": "app/dependencies/firestore.py",
+      "target": "app/dao/firestore_dao.py"
+    },
+    {
+      "source": "app/dependencies/firestore.py",
+      "target": "app/services/firestore.py"
+    },
+    {
+      "source": "app/dependencies/firestore.py",
+      "target": "app/utils/logging.py"
+    },
+    {
       "source": "app/main.py",
       "target": "app/config.py"
     },
@@ -142,8 +257,36 @@
       "target": "app/routes/health.py"
     },
     {
+      "source": "app/services/firestore.py",
+      "target": "app/config.py"
+    },
+    {
+      "source": "app/services/firestore.py",
+      "target": "app/utils/logging.py"
+    },
+    {
       "source": "tests/test_config.py",
       "target": "app/config.py"
+    },
+    {
+      "source": "tests/test_firestore_dao.py",
+      "target": "app/dao/firestore_dao.py"
+    },
+    {
+      "source": "tests/test_firestore_dao.py",
+      "target": "app/services/firestore.py"
+    },
+    {
+      "source": "tests/test_firestore_dao.py",
+      "target": "app/dependencies/firestore.py"
+    },
+    {
+      "source": "tests/test_firestore_dao.py",
+      "target": "app/config.py"
+    },
+    {
+      "source": "tests/test_firestore_dao.py",
+      "target": "app/main.py"
     },
     {
       "source": "tests/test_health.py",
@@ -161,17 +304,28 @@
       "logging",
       "os",
       "sys",
+      "threading",
+      "threading.Lock",
       "typing.Any",
       "typing.AsyncIterator",
       "typing.Dict",
-      "typing.Optional"
+      "typing.Optional",
+      "unittest.mock.AsyncMock",
+      "unittest.mock.MagicMock",
+      "unittest.mock.Mock",
+      "unittest.mock.patch"
     ],
     "third-party": [
       "fastapi.APIRouter",
+      "fastapi.Depends",
       "fastapi.FastAPI",
+      "fastapi.HTTPException",
       "fastapi.Request",
       "fastapi.middleware.cors.CORSMiddleware",
+      "fastapi.status",
       "fastapi.testclient.TestClient",
+      "google.api_core.exceptions",
+      "google.cloud.firestore",
       "pydantic.Field",
       "pydantic.ValidationError",
       "pydantic.field_validator",
@@ -181,7 +335,7 @@
       "pythonjsonlogger.jsonlogger",
       "uvicorn"
     ],
-    "stdlib_count": 9,
-    "third-party_count": 13
+    "stdlib_count": 15,
+    "third-party_count": 18
   }
 }

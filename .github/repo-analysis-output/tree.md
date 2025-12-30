@@ -8,15 +8,26 @@
   ├── repo-analysis-output
     ├── dependencies.json
     ├── dependencies.md
+    ├── file-summaries.json
+    ├── file-summaries.md
     ├── SUMMARY.md
     ├── tree.json
     └── tree.md
   └── workflows
     └── af_maintenance.yml
 ├── app
+  ├── dao
+    ├── __init__.py
+    └── firestore_dao.py
+  ├── dependencies
+    ├── __init__.py
+    └── firestore.py
   ├── routes
     ├── __init__.py
     └── health.py
+  ├── services
+    ├── __init__.py
+    └── firestore.py
   ├── utils
     ├── __init__.py
     └── logging.py
@@ -26,6 +37,7 @@
 ├── tests
   ├── __init__.py
   ├── test_config.py
+  ├── test_firestore_dao.py
   └── test_health.py
 ├── .env.example
 ├── .gitignore

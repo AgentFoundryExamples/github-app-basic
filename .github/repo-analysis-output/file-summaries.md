@@ -4,7 +4,7 @@ Heuristic summaries of source files based on filenames, extensions, and paths.
 
 Schema Version: 2.0
 
-Total files: 10
+Total files: 17
 
 ## app/__init__.py
 **Language:** Python  
@@ -22,6 +22,42 @@ Total files: 10
 **Summary:** Python configuration file (role: configuration)  
 **Size:** 4.06 KB  
 **LOC:** 71  
+**TODOs/FIXMEs:** 0  
+
+## app/dao/__init__.py
+**Language:** Python  
+**Role:** module-init  
+**Role Justification:** module initialization file '__init__'  
+**Summary:** Python module initialization (role: module-init)  
+**Size:** 0.62 KB  
+**LOC:** 1  
+**TODOs/FIXMEs:** 0  
+
+## app/dao/firestore_dao.py
+**Language:** Python  
+**Role:** implementation  
+**Role Justification:** general implementation file (default classification)  
+**Summary:** Python module for firestore dao  
+**Size:** 6.65 KB  
+**LOC:** 150  
+**TODOs/FIXMEs:** 0  
+
+## app/dependencies/__init__.py
+**Language:** Python  
+**Role:** module-init  
+**Role Justification:** module initialization file '__init__'  
+**Summary:** Python module initialization (role: module-init)  
+**Size:** 0.61 KB  
+**LOC:** 1  
+**TODOs/FIXMEs:** 0  
+
+## app/dependencies/firestore.py
+**Language:** Python  
+**Role:** implementation  
+**Role Justification:** general implementation file (default classification)  
+**Summary:** Python module for firestore  
+**Size:** 2.87 KB  
+**LOC:** 51  
 **TODOs/FIXMEs:** 0  
 
 ## app/main.py
@@ -49,6 +85,24 @@ Total files: 10
 **Summary:** Python module for health  
 **Size:** 0.97 KB  
 **LOC:** 14  
+**TODOs/FIXMEs:** 0  
+
+## app/services/__init__.py
+**Language:** Python  
+**Role:** module-init  
+**Role Justification:** module initialization file '__init__'  
+**Summary:** Python module initialization (role: module-init)  
+**Size:** 0.61 KB  
+**LOC:** 1  
+**TODOs/FIXMEs:** 0  
+
+## app/services/firestore.py
+**Language:** Python  
+**Role:** implementation  
+**Role Justification:** general implementation file (default classification)  
+**Summary:** Python module for firestore  
+**Size:** 4.24 KB  
+**LOC:** 70  
 **TODOs/FIXMEs:** 0  
 
 ## app/utils/__init__.py
@@ -85,6 +139,15 @@ Total files: 10
 **Summary:** Python test file (role: test)  
 **Size:** 2.52 KB  
 **LOC:** 33  
+**TODOs/FIXMEs:** 0  
+
+## tests/test_firestore_dao.py
+**Language:** Python  
+**Role:** test  
+**Role Justification:** filename starts with 'test_'  
+**Summary:** Python test file (role: test)  
+**Size:** 17.09 KB  
+**LOC:** 305  
 **TODOs/FIXMEs:** 0  
 
 ## tests/test_health.py

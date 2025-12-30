@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "total_files": 10,
+  "total_files": 17,
   "files": [
     {
       "schema_version": "2.0",
@@ -27,6 +27,62 @@
       "metrics": {
         "size_bytes": 4157,
         "loc": 71,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/dao/__init__.py",
+      "language": "Python",
+      "role": "module-init",
+      "role_justification": "module initialization file '__init__'",
+      "summary": "Python module initialization (role: module-init)",
+      "summary_text": "Python module initialization (role: module-init)",
+      "metrics": {
+        "size_bytes": 634,
+        "loc": 1,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/dao/firestore_dao.py",
+      "language": "Python",
+      "role": "implementation",
+      "role_justification": "general implementation file (default classification)",
+      "summary": "Python module for firestore dao",
+      "summary_text": "Python module for firestore dao",
+      "metrics": {
+        "size_bytes": 6813,
+        "loc": 150,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/dependencies/__init__.py",
+      "language": "Python",
+      "role": "module-init",
+      "role_justification": "module initialization file '__init__'",
+      "summary": "Python module initialization (role: module-init)",
+      "summary_text": "Python module initialization (role: module-init)",
+      "metrics": {
+        "size_bytes": 624,
+        "loc": 1,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/dependencies/firestore.py",
+      "language": "Python",
+      "role": "implementation",
+      "role_justification": "general implementation file (default classification)",
+      "summary": "Python module for firestore",
+      "summary_text": "Python module for firestore",
+      "metrics": {
+        "size_bytes": 2940,
+        "loc": 51,
         "todo_count": 0
       }
     },
@@ -69,6 +125,34 @@
       "metrics": {
         "size_bytes": 994,
         "loc": 14,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/services/__init__.py",
+      "language": "Python",
+      "role": "module-init",
+      "role_justification": "module initialization file '__init__'",
+      "summary": "Python module initialization (role: module-init)",
+      "summary_text": "Python module initialization (role: module-init)",
+      "metrics": {
+        "size_bytes": 628,
+        "loc": 1,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/services/firestore.py",
+      "language": "Python",
+      "role": "implementation",
+      "role_justification": "general implementation file (default classification)",
+      "summary": "Python module for firestore",
+      "summary_text": "Python module for firestore",
+      "metrics": {
+        "size_bytes": 4343,
+        "loc": 70,
         "todo_count": 0
       }
     },
@@ -125,6 +209,20 @@
       "metrics": {
         "size_bytes": 2576,
         "loc": 33,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "tests/test_firestore_dao.py",
+      "language": "Python",
+      "role": "test",
+      "role_justification": "filename starts with 'test_'",
+      "summary": "Python test file (role: test)",
+      "summary_text": "Python test file (role: test)",
+      "metrics": {
+        "size_bytes": 17499,
+        "loc": 305,
         "todo_count": 0
       }
     },

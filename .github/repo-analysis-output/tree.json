@@ -38,6 +38,14 @@
             },
             {
               "type": "file",
+              "name": "file-summaries.json"
+            },
+            {
+              "type": "file",
+              "name": "file-summaries.md"
+            },
+            {
+              "type": "file",
               "name": "SUMMARY.md"
             },
             {
@@ -68,6 +76,34 @@
       "children": [
         {
           "type": "directory",
+          "name": "dao",
+          "children": [
+            {
+              "type": "file",
+              "name": "__init__.py"
+            },
+            {
+              "type": "file",
+              "name": "firestore_dao.py"
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "dependencies",
+          "children": [
+            {
+              "type": "file",
+              "name": "__init__.py"
+            },
+            {
+              "type": "file",
+              "name": "firestore.py"
+            }
+          ]
+        },
+        {
+          "type": "directory",
           "name": "routes",
           "children": [
             {
@@ -77,6 +113,20 @@
             {
               "type": "file",
               "name": "health.py"
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "services",
+          "children": [
+            {
+              "type": "file",
+              "name": "__init__.py"
+            },
+            {
+              "type": "file",
+              "name": "firestore.py"
             }
           ]
         },
@@ -119,6 +169,10 @@
         {
           "type": "file",
           "name": "test_config.py"
+        },
+        {
+          "type": "file",
+          "name": "test_firestore_dao.py"
         },
         {
           "type": "file",
