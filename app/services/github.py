@@ -443,16 +443,15 @@ class GitHubTokenRefreshManager:
             if last_attempt_str and last_status == "failed":
                 # Parse ISO datetime string to timezone-aware datetime
                 last_attempt = None
-                if last_attempt_str:
-                    try:
-                        last_attempt = datetime.fromisoformat(last_attempt_str)
-                        # Ensure timezone-aware - if naive, assume UTC
-                        if last_attempt.tzinfo is None:
-                            last_attempt = last_attempt.replace(tzinfo=timezone.utc)
-                    except (ValueError, TypeError):
-                        logger.warning(
-                            f"Failed to parse last_refresh_attempt datetime: {last_attempt_str}"
-                        )
+                try:
+                    last_attempt = datetime.fromisoformat(last_attempt_str)
+                    # Ensure timezone-aware - if naive, assume UTC
+                    if last_attempt.tzinfo is None:
+                        last_attempt = last_attempt.replace(tzinfo=timezone.utc)
+                except (ValueError, TypeError):
+                    logger.warning(
+                        f"Failed to parse last_refresh_attempt datetime: {last_attempt_str}"
+                    )
                 
                 if last_attempt:
                     time_since_last_attempt = (now - last_attempt).total_seconds()
@@ -594,7 +593,7 @@ class GitHubTokenRefreshManager:
         for attempt in range(max_retries):
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(url, json=payload, headers=headers)
+                    response = await client.post(url, data=payload, headers=headers)
                     
                     # Log response at debug level (sanitized)
                     logger.debug(
