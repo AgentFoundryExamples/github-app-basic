@@ -26,6 +26,9 @@ from pythonjsonlogger import jsonlogger
 # Context variable to store request ID for the current request
 request_id_var: ContextVar[Optional[str]] = ContextVar('request_id', default=None)
 
+# Context variable to store correlation ID for OAuth/transaction flows
+correlation_id_var: ContextVar[Optional[str]] = ContextVar('correlation_id', default=None)
+
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
     """Custom JSON formatter that adds standard fields to all log records."""
@@ -55,6 +58,11 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         request_id = request_id_var.get()
         if request_id:
             log_record["request_id"] = request_id
+        
+        # Add correlation_id from context variable if available
+        correlation_id = correlation_id_var.get()
+        if correlation_id:
+            log_record["correlation_id"] = correlation_id
         
         # Add any extra fields
         if hasattr(record, "extra_fields"):
