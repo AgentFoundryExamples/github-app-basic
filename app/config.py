@@ -62,6 +62,20 @@ class Settings(BaseSettings):
     # CORS (disabled by default)
     enable_cors: bool = Field(default=False, description="Enable CORS middleware")
     
+    # Token Storage Configuration
+    github_token_encryption_key: Optional[str] = Field(
+        default=None, 
+        description="Symmetric encryption key for GitHub tokens (32-byte hex string)"
+    )
+    github_tokens_collection: str = Field(
+        default="github_tokens", 
+        description="Firestore collection name for GitHub tokens"
+    )
+    github_tokens_doc_id: str = Field(
+        default="primary_user", 
+        description="Document ID for the primary GitHub token"
+    )
+    
     @field_validator("app_env")
     @classmethod
     def validate_app_env(cls, v: str) -> str:
@@ -115,6 +129,39 @@ class Settings(BaseSettings):
         
         return v
     
+    @field_validator("github_token_encryption_key", mode="before")
+    @classmethod
+    def validate_github_token_encryption_key(cls, v: Optional[str]) -> Optional[str]:
+        """Validate encryption key format.
+        
+        Ensures the key is a valid hex string of appropriate length (32 bytes = 64 hex chars).
+        """
+        if v is None:
+            return None
+        
+        v = v.strip()
+        if not v:
+            return None
+        
+        # Validate hex format
+        try:
+            bytes.fromhex(v)
+        except ValueError:
+            raise ValueError(
+                "GITHUB_TOKEN_ENCRYPTION_KEY must be a valid hexadecimal string. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'"
+            )
+        
+        # Check length (32 bytes = 64 hex characters for AES-256)
+        if len(v) != 64:
+            raise ValueError(
+                "GITHUB_TOKEN_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes) for AES-256 encryption. "
+                f"Provided key is {len(v)} characters. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'"
+            )
+        
+        return v
+    
     @model_validator(mode='after')
     def validate_production_settings(self) -> "Settings":
         """Validate that required settings are present for production.
@@ -132,6 +179,7 @@ class Settings(BaseSettings):
             "github_client_id": self.github_client_id,
             "github_client_secret": self.github_client_secret,
             "github_oauth_redirect_uri": self.github_oauth_redirect_uri,
+            "github_token_encryption_key": self.github_token_encryption_key,
         }
         
         missing_fields = [

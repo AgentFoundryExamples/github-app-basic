@@ -60,12 +60,14 @@ class TestSettings:
     
     def test_production_validation_with_all_required_fields(self, monkeypatch):
         """Test that production validation passes with all required fields."""
+        import secrets
         monkeypatch.setenv("APP_ENV", "prod")
         monkeypatch.setenv("GITHUB_APP_ID", "123456")
         monkeypatch.setenv("GITHUB_APP_PRIVATE_KEY_PEM", "-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----")
         monkeypatch.setenv("GITHUB_CLIENT_ID", "Iv1.abc123")
         monkeypatch.setenv("GITHUB_CLIENT_SECRET", "secret123")
         monkeypatch.setenv("GITHUB_OAUTH_REDIRECT_URI", "https://example.com/callback")
+        monkeypatch.setenv("GITHUB_TOKEN_ENCRYPTION_KEY", secrets.token_hex(32))
         
         # Should not raise - validation happens automatically
         settings = Settings(_env_file=None)
@@ -79,6 +81,7 @@ class TestSettings:
     def test_production_validation_logs_warning_for_missing_webhook_secret(self, monkeypatch, caplog):
         """Test that missing webhook secret logs a warning but doesn't fail."""
         import logging
+        import secrets
         
         monkeypatch.setenv("APP_ENV", "prod")
         monkeypatch.setenv("GITHUB_APP_ID", "123456")
@@ -86,6 +89,7 @@ class TestSettings:
         monkeypatch.setenv("GITHUB_CLIENT_ID", "Iv1.abc123")
         monkeypatch.setenv("GITHUB_CLIENT_SECRET", "secret123")
         monkeypatch.setenv("GITHUB_OAUTH_REDIRECT_URI", "https://example.com/callback")
+        monkeypatch.setenv("GITHUB_TOKEN_ENCRYPTION_KEY", secrets.token_hex(32))
         
         with caplog.at_level(logging.WARNING):
             # Validation happens automatically during instantiation
@@ -178,3 +182,66 @@ MIIEpAIBAAKCAQEA1234
         # Should raise during instantiation due to missing field
         with pytest.raises(ValueError, match="GITHUB_OAUTH_REDIRECT_URI"):
             Settings(_env_file=None)
+    
+    def test_encryption_key_validation_valid_key(self, monkeypatch):
+        """Test that valid encryption key is accepted."""
+        import secrets
+        valid_key = secrets.token_hex(32)
+        monkeypatch.setenv("GITHUB_TOKEN_ENCRYPTION_KEY", valid_key)
+        
+        settings = Settings(_env_file=None)
+        assert settings.github_token_encryption_key == valid_key
+    
+    def test_encryption_key_validation_invalid_hex(self, monkeypatch):
+        """Test that invalid hex format raises error."""
+        monkeypatch.setenv("GITHUB_TOKEN_ENCRYPTION_KEY", "not_valid_hex!")
+        
+        with pytest.raises(ValueError, match="valid hexadecimal string"):
+            Settings(_env_file=None)
+    
+    def test_encryption_key_validation_wrong_length(self, monkeypatch):
+        """Test that wrong key length raises error."""
+        short_key = "a" * 32  # 16 bytes, not 32
+        monkeypatch.setenv("GITHUB_TOKEN_ENCRYPTION_KEY", short_key)
+        
+        with pytest.raises(ValueError, match="exactly 64 hex characters"):
+            Settings(_env_file=None)
+    
+    def test_encryption_key_optional_in_dev(self, monkeypatch):
+        """Test that encryption key is optional in dev mode."""
+        monkeypatch.setenv("APP_ENV", "dev")
+        monkeypatch.delenv("GITHUB_TOKEN_ENCRYPTION_KEY", raising=False)
+        
+        settings = Settings(_env_file=None)
+        assert settings.github_token_encryption_key is None
+    
+    def test_encryption_key_required_in_prod(self, monkeypatch):
+        """Test that encryption key is required in production."""
+        import secrets
+        monkeypatch.setenv("APP_ENV", "prod")
+        monkeypatch.setenv("GITHUB_APP_ID", "123456")
+        monkeypatch.setenv("GITHUB_APP_PRIVATE_KEY_PEM", "-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----")
+        monkeypatch.setenv("GITHUB_CLIENT_ID", "Iv1.abc123")
+        monkeypatch.setenv("GITHUB_CLIENT_SECRET", "secret123")
+        monkeypatch.setenv("GITHUB_OAUTH_REDIRECT_URI", "https://example.com/callback")
+        # Intentionally omit GITHUB_TOKEN_ENCRYPTION_KEY
+        
+        with pytest.raises(ValueError, match="GITHUB_TOKEN_ENCRYPTION_KEY"):
+            Settings(_env_file=None)
+    
+    def test_token_storage_defaults(self, monkeypatch):
+        """Test that token storage configuration has correct defaults."""
+        monkeypatch.setenv("APP_ENV", "dev")
+        
+        settings = Settings(_env_file=None)
+        assert settings.github_tokens_collection == "github_tokens"
+        assert settings.github_tokens_doc_id == "primary_user"
+    
+    def test_token_storage_custom_values(self, monkeypatch):
+        """Test that token storage configuration can be customized."""
+        monkeypatch.setenv("GITHUB_TOKENS_COLLECTION", "custom_tokens")
+        monkeypatch.setenv("GITHUB_TOKENS_DOC_ID", "custom_user")
+        
+        settings = Settings(_env_file=None)
+        assert settings.github_tokens_collection == "custom_tokens"
+        assert settings.github_tokens_doc_id == "custom_user"
