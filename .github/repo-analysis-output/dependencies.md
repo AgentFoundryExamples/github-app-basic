@@ -10,14 +10,14 @@ Includes classification of external dependencies as stdlib vs third-party.
 
 - **Total files**: 21
 - **Intra-repo dependencies**: 26
-- **External stdlib dependencies**: 21
-- **External third-party dependencies**: 27
+- **External stdlib dependencies**: 22
+- **External third-party dependencies**: 28
 
 ## External Dependencies
 
 ### Standard Library / Core Modules
 
-Total: 21 unique modules
+Total: 22 unique modules
 
 - `contextlib.asynccontextmanager`
 - `contextvars.ContextVar`
@@ -26,6 +26,7 @@ Total: 21 unique modules
 - `http.client`
 - `logging`
 - `os`
+- `re`
 - `secrets`
 - `sys`
 - `threading`
@@ -38,12 +39,11 @@ Total: 21 unique modules
 - `unittest.mock.AsyncMock`
 - `unittest.mock.MagicMock`
 - `unittest.mock.Mock`
-- `unittest.mock.patch`
-- ... and 1 more (see JSON for full list)
+- ... and 2 more (see JSON for full list)
 
 ### Third-Party Packages
 
-Total: 27 unique packages
+Total: 28 unique packages
 
 - `cryptography.hazmat.backends.default_backend`
 - `cryptography.hazmat.primitives.asymmetric.rsa`
@@ -52,6 +52,7 @@ Total: 27 unique packages
 - `fastapi.Depends`
 - `fastapi.FastAPI`
 - `fastapi.HTTPException`
+- `fastapi.Query`
 - `fastapi.Request`
 - `fastapi.Response`
 - `fastapi.middleware.cors.CORSMiddleware`
@@ -64,8 +65,7 @@ Total: 27 unique packages
 - `httpx`
 - `jwt`
 - `pydantic.Field`
-- `pydantic.ValidationError`
-- ... and 7 more (see JSON for full list)
+- ... and 8 more (see JSON for full list)
 
 ## Most Depended Upon Files (Intra-Repo)
 

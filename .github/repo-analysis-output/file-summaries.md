@@ -92,8 +92,8 @@ Total files: 21
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for oauth  
-**Size:** 16.55 KB  
-**LOC:** 425  
+**Size:** 23.66 KB  
+**LOC:** 596  
 **TODOs/FIXMEs:** 0  
 
 ## app/services/__init__.py

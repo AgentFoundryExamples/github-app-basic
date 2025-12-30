@@ -124,6 +124,7 @@
       "type": "file",
       "external_dependencies": {
         "stdlib": [
+          "re",
           "secrets",
           "typing.Optional",
           "urllib.parse.urlencode"
@@ -131,6 +132,7 @@
         "third-party": [
           "fastapi.APIRouter",
           "fastapi.HTTPException",
+          "fastapi.Query",
           "fastapi.Request",
           "fastapi.Response",
           "fastapi.responses.HTMLResponse",
@@ -420,6 +422,7 @@
       "http.client",
       "logging",
       "os",
+      "re",
       "secrets",
       "sys",
       "threading",
@@ -443,6 +446,7 @@
       "fastapi.Depends",
       "fastapi.FastAPI",
       "fastapi.HTTPException",
+      "fastapi.Query",
       "fastapi.Request",
       "fastapi.Response",
       "fastapi.middleware.cors.CORSMiddleware",
@@ -464,7 +468,7 @@
       "pythonjsonlogger.jsonlogger",
       "uvicorn"
     ],
-    "stdlib_count": 21,
-    "third-party_count": 27
+    "stdlib_count": 22,
+    "third-party_count": 28
   }
 }

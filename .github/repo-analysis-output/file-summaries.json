@@ -137,8 +137,8 @@
       "summary": "Python module for oauth",
       "summary_text": "Python module for oauth",
       "metrics": {
-        "size_bytes": 16952,
-        "loc": 425,
+        "size_bytes": 24230,
+        "loc": 596,
         "todo_count": 0
       }
     },
