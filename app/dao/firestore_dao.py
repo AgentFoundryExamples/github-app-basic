@@ -15,14 +15,21 @@
 
 This module provides a Data Access Object (DAO) for Firestore operations,
 exposing methods like get_document and set_document with typed responses
-and structured error handling.
+and structured error handling. It also provides encrypted token storage
+for GitHub OAuth tokens.
 """
 
+import base64
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from google.cloud import firestore
 from google.api_core import exceptions as gcp_exceptions
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+from cryptography.exceptions import InvalidTag
+import secrets
 
-from app.utils.logging import get_logger
+from app.utils.logging import get_logger, mask_sensitive_data
 
 logger = get_logger(__name__)
 
@@ -31,16 +38,30 @@ class FirestoreDAO:
     """Data Access Object for Firestore operations.
     
     Provides async-friendly wrappers for common Firestore operations
-    with proper error handling and logging.
+    with proper error handling and logging. Includes support for
+    encrypted GitHub token storage.
     """
     
-    def __init__(self, client: firestore.AsyncClient):
+    def __init__(self, client: firestore.AsyncClient, encryption_key: Optional[str] = None):
         """Initialize FirestoreDAO with a Firestore async client.
         
         Args:
             client: Initialized Firestore async client instance.
+            encryption_key: Optional hex-encoded encryption key for token encryption (32 bytes).
         """
         self.client = client
+        self._encryption_key_bytes: Optional[bytes] = None
+        
+        if encryption_key:
+            try:
+                self._encryption_key_bytes = bytes.fromhex(encryption_key)
+                if len(self._encryption_key_bytes) != 32:
+                    raise ValueError(f"Encryption key must be 32 bytes, got {len(self._encryption_key_bytes)}")
+                logger.info("Encryption key configured for token storage")
+            except ValueError as e:
+                error_msg = f"Invalid encryption key format: {str(e)}"
+                logger.error(error_msg)
+                raise ValueError(error_msg) from e
     
     async def get_document(
         self, 
@@ -190,3 +211,255 @@ class FirestoreDAO:
             )
             logger.error(error_msg, exc_info=True)
             raise
+    
+    def _encrypt_token(self, token: str) -> str:
+        """Encrypt a token using AES-256-GCM.
+        
+        Args:
+            token: The plaintext token to encrypt.
+            
+        Returns:
+            Base64-encoded string containing nonce, ciphertext, and tag.
+            
+        Raises:
+            ValueError: If encryption key is not configured.
+        """
+        if not self._encryption_key_bytes:
+            raise ValueError(
+                "Encryption key not configured. Set GITHUB_TOKEN_ENCRYPTION_KEY environment variable."
+            )
+        
+        # Generate a random 96-bit nonce as recommended for GCM
+        nonce = secrets.token_bytes(12)
+        
+        # Create cipher
+        cipher = Cipher(
+            algorithms.AES(self._encryption_key_bytes),
+            modes.GCM(nonce),
+            backend=default_backend()
+        )
+        encryptor = cipher.encryptor()
+        
+        # Encrypt
+        encrypted = encryptor.update(token.encode('utf-8')) + encryptor.finalize()
+        
+        # Prepend nonce and append tag, then base64 encode
+        combined = nonce + encrypted + encryptor.tag
+        return base64.b64encode(combined).decode('utf-8')
+    
+    def _decrypt_token(self, encrypted_token: str) -> str:
+        """Decrypt a token using AES-256-GCM.
+        
+        Args:
+            encrypted_token: Base64-encoded string containing nonce, ciphertext, and tag.
+            
+        Returns:
+            Decrypted plaintext token.
+            
+        Raises:
+            ValueError: If encryption key is not configured or decryption fails.
+        """
+        if not self._encryption_key_bytes:
+            raise ValueError(
+                "Encryption key not configured. Set GITHUB_TOKEN_ENCRYPTION_KEY environment variable."
+            )
+        
+        try:
+            # Decode from base64
+            combined = base64.b64decode(encrypted_token)
+            
+            # Validate minimum length (12 bytes nonce + 16 bytes tag)
+            if len(combined) < 28:
+                raise ValueError(
+                    f"Encrypted data too short: expected at least 28 bytes, got {len(combined)}"
+                )
+            
+            # Extract nonce, ciphertext, and tag
+            nonce = combined[:12]
+            tag = combined[-16:]
+            encrypted = combined[12:-16]
+            
+            # Create cipher
+            cipher = Cipher(
+                algorithms.AES(self._encryption_key_bytes),
+                modes.GCM(nonce, tag),
+                backend=default_backend()
+            )
+            decryptor = cipher.decryptor()
+            
+            # Decrypt
+            data = decryptor.update(encrypted) + decryptor.finalize()
+            
+            return data.decode('utf-8')
+        except (ValueError, InvalidTag, TypeError) as e:
+            error_msg = f"Failed to decrypt token: {str(e)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg) from e
+    
+    async def save_github_token(
+        self,
+        collection: str,
+        doc_id: str,
+        access_token: str,
+        token_type: str = "bearer",
+        scope: Optional[str] = None,
+        expires_at: Optional[datetime] = None,
+        refresh_token: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Save GitHub OAuth token with encryption.
+        
+        Args:
+            collection: Firestore collection name.
+            doc_id: Document ID for the token.
+            access_token: GitHub access token to encrypt and store.
+            token_type: Token type (typically "bearer").
+            scope: OAuth scopes granted.
+            expires_at: Token expiration time (must be timezone-aware).
+            refresh_token: Optional refresh token (also encrypted).
+            
+        Returns:
+            Dictionary containing the persisted metadata (without decrypted tokens).
+            
+        Raises:
+            ValueError: If encryption key is not configured or data is invalid.
+            PermissionError: If Firestore access is denied.
+            Exception: For other Firestore errors.
+        """
+        if not access_token:
+            raise ValueError("access_token is required")
+        
+        # Validate expires_at is timezone-aware if provided
+        if expires_at is not None and expires_at.tzinfo is None:
+            raise ValueError(
+                "expires_at must be timezone-aware. Use datetime.now(timezone.utc) or "
+                "ensure your datetime object has tzinfo set."
+            )
+        
+        # Encrypt the access token
+        encrypted_access_token = self._encrypt_token(access_token)
+        
+        # Encrypt refresh token if provided
+        encrypted_refresh_token = None
+        if refresh_token:
+            encrypted_refresh_token = self._encrypt_token(refresh_token)
+        
+        # Build document data
+        now_utc = datetime.now(timezone.utc)
+        data = {
+            "access_token": encrypted_access_token,
+            "token_type": token_type,
+            "scope": scope,
+            "expires_at": expires_at.isoformat() if expires_at else None,
+            "refresh_token": encrypted_refresh_token,
+            "updated_at": now_utc.isoformat()
+        }
+        
+        logger.info(
+            "Saving GitHub token to Firestore",
+            extra={"extra_fields": {
+                "collection": collection,
+                "doc_id": doc_id,
+                "token_type": token_type,
+                "scope": scope,
+                "has_refresh_token": refresh_token is not None,
+                "access_token_preview": mask_sensitive_data(access_token, 4)
+            }}
+        )
+        
+        # Save to Firestore
+        await self.set_document(collection, doc_id, data, merge=False)
+        
+        # Return metadata without decrypted tokens
+        return {
+            "token_type": token_type,
+            "scope": scope,
+            "expires_at": data["expires_at"],
+            "has_refresh_token": refresh_token is not None,
+            "updated_at": data["updated_at"]
+        }
+    
+    async def get_github_token(
+        self,
+        collection: str,
+        doc_id: str,
+        decrypt: bool = True
+    ) -> Optional[Dict[str, Any]]:
+        """Retrieve GitHub OAuth token with optional decryption.
+        
+        Args:
+            collection: Firestore collection name.
+            doc_id: Document ID for the token.
+            decrypt: If True, decrypt the access_token and refresh_token.
+            
+        Returns:
+            Dictionary containing token data, or None if not found.
+            If decrypt=True, includes decrypted "access_token" and "refresh_token".
+            If decrypt=False, includes encrypted values as-is.
+            
+        Raises:
+            ValueError: If decryption fails.
+            PermissionError: If Firestore access is denied.
+            Exception: For other Firestore errors.
+        """
+        logger.info(
+            "Retrieving GitHub token from Firestore",
+            extra={"extra_fields": {
+                "collection": collection,
+                "doc_id": doc_id,
+                "decrypt": decrypt
+            }}
+        )
+        
+        data = await self.get_document(collection, doc_id)
+        
+        if not data:
+            return None
+        
+        if decrypt:
+            # Decrypt access token
+            encrypted_access_token = data.get("access_token")
+            if encrypted_access_token:
+                data["access_token"] = self._decrypt_token(encrypted_access_token)
+            
+            # Decrypt refresh token if present
+            encrypted_refresh_token = data.get("refresh_token")
+            if encrypted_refresh_token:
+                data["refresh_token"] = self._decrypt_token(encrypted_refresh_token)
+        
+        return data
+    
+    async def get_github_token_metadata(
+        self,
+        collection: str,
+        doc_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Retrieve GitHub token metadata without decryption.
+        
+        Useful for admin endpoints or health checks that need to verify
+        token existence without exposing sensitive data.
+        
+        Args:
+            collection: Firestore collection name.
+            doc_id: Document ID for the token.
+            
+        Returns:
+            Dictionary containing metadata (token_type, scope, expires_at, updated_at),
+            or None if not found. Does not include decrypted tokens.
+            
+        Raises:
+            PermissionError: If Firestore access is denied.
+            Exception: For other Firestore errors.
+        """
+        data = await self.get_github_token(collection, doc_id, decrypt=False)
+        
+        if not data:
+            return None
+        
+        # Return only metadata fields, excluding encrypted tokens
+        return {
+            "token_type": data.get("token_type"),
+            "scope": data.get("scope"),
+            "expires_at": data.get("expires_at"),
+            "has_refresh_token": data.get("refresh_token") is not None,
+            "updated_at": data.get("updated_at")
+        }

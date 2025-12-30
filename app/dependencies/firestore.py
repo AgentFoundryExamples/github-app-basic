@@ -58,7 +58,7 @@ def get_firestore_dao(settings: Settings = Depends(get_settings)) -> FirestoreDA
     """
     try:
         client = get_firestore_client(settings)
-        return FirestoreDAO(client)
+        return FirestoreDAO(client, encryption_key=settings.github_token_encryption_key)
         
     except ValueError as e:
         # Configuration error (missing GCP_PROJECT_ID, etc.)

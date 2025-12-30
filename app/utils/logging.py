@@ -108,3 +108,33 @@ def get_logger(name: str) -> logging.Logger:
         A configured logger instance.
     """
     return logging.getLogger(name)
+
+
+def mask_sensitive_data(value: str, visible_chars: int = 4) -> str:
+    """Mask sensitive data for safe logging.
+    
+    Shows only the first N characters and masks the rest with asterisks.
+    
+    Args:
+        value: The sensitive string to mask.
+        visible_chars: Number of characters to show at the beginning.
+        
+    Returns:
+        Masked string in format "abcd****" (for visible_chars=4).
+        
+    Examples:
+        >>> mask_sensitive_data("secret_token_12345", 4)
+        "secr****************"
+        >>> mask_sensitive_data("abc", 4)
+        "abc"
+        >>> mask_sensitive_data("", 4)
+        "****"
+    """
+    if not value:
+        return "****"
+    
+    if len(value) <= visible_chars:
+        return value
+    
+    masked_length = len(value) - visible_chars
+    return f"{value[:visible_chars]}{'*' * masked_length}"
