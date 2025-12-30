@@ -35,6 +35,7 @@
   ├── utils
     ├── __init__.py
     ├── logging.py
+    ├── metrics.py
     └── security.py
   ├── __init__.py
   ├── config.py
@@ -49,6 +50,7 @@
   ├── test_config.py
   ├── test_firestore_dao.py
   ├── test_health.py
+  ├── test_logging_and_metrics.py
   ├── test_oauth_flow.py
   ├── test_security_utils.py
   ├── test_token_endpoint.py

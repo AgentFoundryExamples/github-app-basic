@@ -160,6 +160,10 @@
             },
             {
               "type": "file",
+              "name": "metrics.py"
+            },
+            {
+              "type": "file",
               "name": "security.py"
             }
           ]
@@ -219,6 +223,10 @@
         {
           "type": "file",
           "name": "test_health.py"
+        },
+        {
+          "type": "file",
+          "name": "test_logging_and_metrics.py"
         },
         {
           "type": "file",

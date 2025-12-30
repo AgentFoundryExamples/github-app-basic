@@ -95,6 +95,7 @@
           "contextlib.asynccontextmanager",
           "logging",
           "os",
+          "time",
           "typing.AsyncIterator"
         ],
         "third-party": [
@@ -102,6 +103,7 @@
           "fastapi.Request",
           "fastapi.middleware.cors.CORSMiddleware",
           "fastapi.openapi.utils.get_openapi",
+          "fastapi.responses.PlainTextResponse",
           "uvicorn"
         ]
       }
@@ -266,6 +268,21 @@
         "third-party": [
           "pythonjsonlogger.jsonlogger"
         ]
+      }
+    },
+    {
+      "id": "app/utils/metrics.py",
+      "path": "app/utils/metrics.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "collections.defaultdict",
+          "re",
+          "threading",
+          "typing.Dict",
+          "typing.Optional"
+        ],
+        "third-party": []
       }
     },
     {
@@ -436,6 +453,24 @@
       }
     },
     {
+      "id": "tests/test_logging_and_metrics.py",
+      "path": "tests/test_logging_and_metrics.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "io.StringIO",
+          "json",
+          "threading",
+          "unittest.mock.MagicMock",
+          "unittest.mock.patch"
+        ],
+        "third-party": [
+          "fastapi.testclient.TestClient",
+          "pytest"
+        ]
+      }
+    },
+    {
       "id": "tests/test_oauth_flow.py",
       "path": "tests/test_oauth_flow.py",
       "type": "file",
@@ -578,6 +613,10 @@
     },
     {
       "source": "app/main.py",
+      "target": "app/utils/metrics.py"
+    },
+    {
+      "source": "app/main.py",
       "target": "app/routes/health.py"
     },
     {
@@ -630,6 +669,10 @@
     },
     {
       "source": "app/routes/oauth.py",
+      "target": "app/utils/metrics.py"
+    },
+    {
+      "source": "app/routes/oauth.py",
       "target": "app/dao/firestore_dao.py"
     },
     {
@@ -659,6 +702,10 @@
     {
       "source": "app/routes/token.py",
       "target": "app/utils/security.py"
+    },
+    {
+      "source": "app/routes/token.py",
+      "target": "app/utils/metrics.py"
     },
     {
       "source": "app/services/firestore.py",
@@ -729,6 +776,22 @@
       "target": "app/config.py"
     },
     {
+      "source": "tests/test_logging_and_metrics.py",
+      "target": "app/main.py"
+    },
+    {
+      "source": "tests/test_logging_and_metrics.py",
+      "target": "app/utils/logging.py"
+    },
+    {
+      "source": "tests/test_logging_and_metrics.py",
+      "target": "app/utils/metrics.py"
+    },
+    {
+      "source": "tests/test_logging_and_metrics.py",
+      "target": "app/config.py"
+    },
+    {
       "source": "tests/test_oauth_flow.py",
       "target": "app/main.py"
     },
@@ -782,12 +845,14 @@
       "argparse",
       "asyncio",
       "base64",
+      "collections.defaultdict",
       "contextlib.asynccontextmanager",
       "contextvars.ContextVar",
       "datetime.datetime",
       "datetime.timedelta",
       "datetime.timezone",
       "http.client",
+      "io.StringIO",
       "json",
       "logging",
       "os",
@@ -830,6 +895,7 @@
       "fastapi.middleware.cors.CORSMiddleware",
       "fastapi.openapi.utils.get_openapi",
       "fastapi.responses.HTMLResponse",
+      "fastapi.responses.PlainTextResponse",
       "fastapi.responses.RedirectResponse",
       "fastapi.status",
       "fastapi.testclient.TestClient",
@@ -848,7 +914,7 @@
       "pythonjsonlogger.jsonlogger",
       "uvicorn"
     ],
-    "stdlib_count": 31,
-    "third-party_count": 35
+    "stdlib_count": 33,
+    "third-party_count": 36
   }
 }
