@@ -39,7 +39,9 @@ from typing import Optional
 import json
 
 # Add parent directory to path to import app modules
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from google.cloud import firestore
 from google.api_core import exceptions as gcp_exceptions

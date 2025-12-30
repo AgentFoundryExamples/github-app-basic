@@ -20,7 +20,9 @@ from unittest.mock import Mock, patch, AsyncMock
 import json
 
 # Import script module
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from scripts import show_token_metadata
 
 

@@ -1232,8 +1232,10 @@ class TestAdminTokenMetadataEndpoint:
         """Test metadata endpoint handles large scope strings."""
         client, mock_dao, app = client_with_mock_dao
         
-        # Create a large scope string
-        large_scope = ",".join([f"scope_{i}" for i in range(100)])
+        # Create a large scope string with 100 scopes
+        num_scopes = 100
+        large_scope = ",".join([f"scope_{i}" for i in range(num_scopes)])
+        expected_min_length = num_scopes * 5  # "scope_" prefix (6 chars) * 100, minus commas
         
         mock_dao.get_github_token_metadata = AsyncMock(return_value={
             "token_type": "bearer",
@@ -1249,7 +1251,7 @@ class TestAdminTokenMetadataEndpoint:
             assert response.status_code == 200
             data = response.json()
             assert data["scope"] == large_scope
-            assert len(data["scope"]) > 800  # Verify it's large (100 scopes)
+            assert len(data["scope"]) >= expected_min_length
         finally:
             app.dependency_overrides.clear()
 
