@@ -89,9 +89,12 @@ def reset_firestore_client() -> None:
     """Reset the global Firestore client instance.
     
     Primarily used for testing purposes to allow re-initialization
-    with different settings or to clean up resources.
+    with different settings or to clean up resources. Thread-safe
+    to prevent race conditions during concurrent access.
     """
     global _firestore_client
-    if _firestore_client is not None:
-        logger.info("Resetting Firestore client instance")
-        _firestore_client = None
+    
+    with _client_lock:
+        if _firestore_client is not None:
+            logger.info("Resetting Firestore client instance")
+            _firestore_client = None
