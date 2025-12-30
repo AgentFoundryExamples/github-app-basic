@@ -245,3 +245,10 @@ MIIEpAIBAAKCAQEA1234
         settings = Settings(_env_file=None)
         assert settings.github_tokens_collection == "custom_tokens"
         assert settings.github_tokens_doc_id == "custom_user"
+    
+    def test_encryption_key_whitespace_only_rejected(self, monkeypatch):
+        """Test that whitespace-only encryption key is rejected."""
+        monkeypatch.setenv("GITHUB_TOKEN_ENCRYPTION_KEY", "   ")
+        
+        with pytest.raises(ValueError, match="cannot be empty or whitespace-only"):
+            Settings(_env_file=None)

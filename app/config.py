@@ -141,7 +141,10 @@ class Settings(BaseSettings):
         
         v = v.strip()
         if not v:
-            return None
+            raise ValueError(
+                "GITHUB_TOKEN_ENCRYPTION_KEY cannot be empty or whitespace-only. "
+                "Generate a valid key with: python -c 'import secrets; print(secrets.token_hex(32))'"
+            )
         
         # Validate hex format
         try:

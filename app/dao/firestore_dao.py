@@ -26,7 +26,7 @@ from google.cloud import firestore
 from google.api_core import exceptions as gcp_exceptions
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import padding
+from cryptography.exceptions import InvalidTag
 import secrets
 
 from app.utils.logging import get_logger, mask_sensitive_data
@@ -213,13 +213,13 @@ class FirestoreDAO:
             raise
     
     def _encrypt_token(self, token: str) -> str:
-        """Encrypt a token using AES-256-CBC.
+        """Encrypt a token using AES-256-GCM.
         
         Args:
             token: The plaintext token to encrypt.
             
         Returns:
-            Base64-encoded encrypted token with IV prepended.
+            Base64-encoded string containing nonce, ciphertext, and tag.
             
         Raises:
             ValueError: If encryption key is not configured.
@@ -229,33 +229,29 @@ class FirestoreDAO:
                 "Encryption key not configured. Set GITHUB_TOKEN_ENCRYPTION_KEY environment variable."
             )
         
-        # Generate random IV (16 bytes for AES)
-        iv = secrets.token_bytes(16)
+        # Generate a random 96-bit nonce as recommended for GCM
+        nonce = secrets.token_bytes(12)
         
         # Create cipher
         cipher = Cipher(
             algorithms.AES(self._encryption_key_bytes),
-            modes.CBC(iv),
+            modes.GCM(nonce),
             backend=default_backend()
         )
         encryptor = cipher.encryptor()
         
-        # Apply PKCS7 padding
-        padder = padding.PKCS7(128).padder()
-        padded_data = padder.update(token.encode('utf-8')) + padder.finalize()
-        
         # Encrypt
-        encrypted = encryptor.update(padded_data) + encryptor.finalize()
+        encrypted = encryptor.update(token.encode('utf-8')) + encryptor.finalize()
         
-        # Prepend IV to encrypted data and base64 encode
-        combined = iv + encrypted
+        # Prepend nonce and append tag, then base64 encode
+        combined = nonce + encrypted + encryptor.tag
         return base64.b64encode(combined).decode('utf-8')
     
     def _decrypt_token(self, encrypted_token: str) -> str:
-        """Decrypt a token using AES-256-CBC.
+        """Decrypt a token using AES-256-GCM.
         
         Args:
-            encrypted_token: Base64-encoded encrypted token with IV prepended.
+            encrypted_token: Base64-encoded string containing nonce, ciphertext, and tag.
             
         Returns:
             Decrypted plaintext token.
@@ -272,27 +268,30 @@ class FirestoreDAO:
             # Decode from base64
             combined = base64.b64decode(encrypted_token)
             
-            # Extract IV (first 16 bytes) and encrypted data
-            iv = combined[:16]
-            encrypted = combined[16:]
+            # Validate minimum length (12 bytes nonce + 16 bytes tag)
+            if len(combined) < 28:
+                raise ValueError(
+                    f"Encrypted data too short: expected at least 28 bytes, got {len(combined)}"
+                )
+            
+            # Extract nonce, ciphertext, and tag
+            nonce = combined[:12]
+            tag = combined[-16:]
+            encrypted = combined[12:-16]
             
             # Create cipher
             cipher = Cipher(
                 algorithms.AES(self._encryption_key_bytes),
-                modes.CBC(iv),
+                modes.GCM(nonce, tag),
                 backend=default_backend()
             )
             decryptor = cipher.decryptor()
             
             # Decrypt
-            padded_data = decryptor.update(encrypted) + decryptor.finalize()
-            
-            # Remove PKCS7 padding
-            unpadder = padding.PKCS7(128).unpadder()
-            data = unpadder.update(padded_data) + unpadder.finalize()
+            data = decryptor.update(encrypted) + decryptor.finalize()
             
             return data.decode('utf-8')
-        except Exception as e:
+        except (ValueError, InvalidTag, TypeError) as e:
             error_msg = f"Failed to decrypt token: {str(e)}"
             logger.error(error_msg)
             raise ValueError(error_msg) from e
@@ -315,7 +314,7 @@ class FirestoreDAO:
             access_token: GitHub access token to encrypt and store.
             token_type: Token type (typically "bearer").
             scope: OAuth scopes granted.
-            expires_at: Token expiration time (timezone-aware).
+            expires_at: Token expiration time (must be timezone-aware).
             refresh_token: Optional refresh token (also encrypted).
             
         Returns:
@@ -328,6 +327,13 @@ class FirestoreDAO:
         """
         if not access_token:
             raise ValueError("access_token is required")
+        
+        # Validate expires_at is timezone-aware if provided
+        if expires_at is not None and expires_at.tzinfo is None:
+            raise ValueError(
+                "expires_at must be timezone-aware. Use datetime.now(timezone.utc) or "
+                "ensure your datetime object has tzinfo set."
+            )
         
         # Encrypt the access token
         encrypted_access_token = self._encrypt_token(access_token)

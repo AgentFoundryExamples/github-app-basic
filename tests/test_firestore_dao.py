@@ -600,6 +600,33 @@ class TestEncryptionDecryption:
         encrypted = dao_with_encryption._encrypt_token(token)
         decrypted = dao_with_encryption._decrypt_token(encrypted)
         assert decrypted == token
+    
+    def test_decrypt_short_encrypted_data_raises_error(self, dao_with_encryption):
+        """Test decryption fails with data shorter than minimum length."""
+        import base64
+        # Create data that's too short (less than 28 bytes: 12 nonce + 16 tag)
+        short_data = base64.b64encode(b"tooshort").decode('utf-8')
+        
+        with pytest.raises(ValueError, match="Encrypted data too short"):
+            dao_with_encryption._decrypt_token(short_data)
+    
+    def test_decrypt_tampered_data_raises_error(self, dao_with_encryption):
+        """Test decryption fails with tampered ciphertext (GCM authentication)."""
+        # Encrypt valid token
+        token = "ghs_test_token"
+        encrypted = dao_with_encryption._encrypt_token(token)
+        
+        # Tamper with the ciphertext by modifying middle bytes
+        import base64
+        encrypted_bytes = bytearray(base64.b64decode(encrypted))
+        # Modify a byte in the ciphertext portion (after nonce, before tag)
+        if len(encrypted_bytes) > 20:
+            encrypted_bytes[15] ^= 0xFF  # Flip bits in ciphertext
+        tampered = base64.b64encode(bytes(encrypted_bytes)).decode('utf-8')
+        
+        # Should fail GCM authentication
+        with pytest.raises(ValueError, match="Failed to decrypt"):
+            dao_with_encryption._decrypt_token(tampered)
 
 
 class TestGitHubTokenStorage:
@@ -912,6 +939,30 @@ class TestGitHubTokenStorage:
         
         # Encrypted tokens should be different
         assert call1_data["access_token"] != call2_data["access_token"]
+    
+    @pytest.mark.asyncio
+    async def test_save_token_with_naive_datetime_raises_error(self, dao, mock_client):
+        """Test that saving token with naive datetime raises ValueError."""
+        from datetime import datetime
+        
+        # Create a naive datetime (no timezone)
+        naive_datetime = datetime(2025, 12, 31, 23, 59, 59)
+        
+        # Setup mock
+        mock_doc_ref = Mock()
+        mock_doc_ref.set = AsyncMock()
+        mock_collection = Mock()
+        mock_collection.document.return_value = mock_doc_ref
+        mock_client.collection.return_value = mock_collection
+        
+        # Execute and verify error
+        with pytest.raises(ValueError, match="expires_at must be timezone-aware"):
+            await dao.save_github_token(
+                collection="github_tokens",
+                doc_id="primary_user",
+                access_token="test_token",
+                expires_at=naive_datetime
+            )
 
 
 class TestConfigValidation:
@@ -948,6 +999,24 @@ class TestConfigValidation:
                 _env_file=None,
                 app_env="dev",
                 github_token_encryption_key=short_key
+            )
+    
+    def test_whitespace_only_encryption_key_raises_error(self):
+        """Test that whitespace-only encryption key raises clear error."""
+        with pytest.raises(ValueError, match="cannot be empty or whitespace-only"):
+            Settings(
+                _env_file=None,
+                app_env="dev",
+                github_token_encryption_key="   "
+            )
+    
+    def test_empty_encryption_key_raises_error(self):
+        """Test that empty encryption key raises clear error."""
+        with pytest.raises(ValueError, match="cannot be empty or whitespace-only"):
+            Settings(
+                _env_file=None,
+                app_env="dev",
+                github_token_encryption_key=""
             )
     
     def test_production_requires_encryption_key(self):
