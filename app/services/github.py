@@ -321,7 +321,11 @@ class GitHubOAuthManager:
                 
                 # Log success with masked token
                 token = data["access_token"]
-                masked_token = token[:8] + "..." + token[-4:] if len(token) > 12 else "***"
+                # Show first 4 and last 4 characters for tokens >= 16 chars, otherwise fully mask
+                if len(token) >= 16:
+                    masked_token = token[:4] + "..." + token[-4:]
+                else:
+                    masked_token = "***"
                 
                 logger.info(
                     "OAuth token exchange successful",
