@@ -81,7 +81,34 @@ def create_app() -> FastAPI:
     # Create FastAPI app
     app = FastAPI(
         title="GitHub App Token Minting Service",
-        description="Service for minting GitHub App tokens with GCP integration",
+        description="""
+Service for minting GitHub App tokens with GCP integration.
+
+## Authentication
+
+**Cloud Run IAM Authentication:**
+- All API endpoints (except health check) are protected by Cloud Run IAM authentication at the infrastructure level
+- No application-level authentication is performed
+- Deploy with: `gcloud run deploy --no-allow-unauthenticated`
+- Callers must have the `roles/run.invoker` IAM role
+- Requests must include a valid GCP identity token in the Authorization header: `Bearer <identity-token>`
+
+**Obtaining Identity Tokens:**
+- **User accounts:** `gcloud auth print-identity-token`
+- **Service accounts (Python):** Use `google.auth.default()` and `credentials.id_token`
+- **Service accounts (Node.js):** Use `GoogleAuth.getIdTokenClient(serviceUrl)`
+- **Cloud Scheduler:** Configure OIDC authentication with service account
+
+**Identity Token Audience:**
+- Must match the Cloud Run service URL
+- Use regional URLs (e.g., `https://service-xxxxx-uc.a.run.app`)
+- Do not use custom domains
+
+**Security Conceptual Model:**
+While the OpenAPI specification below describes a conceptual "bearerAuth" security scheme,
+the actual authentication is enforced by Cloud Run's IAM layer, not by this application.
+The bearer token referenced is a GCP identity token, not the GitHub access token.
+        """,
         version="0.1.0",
         lifespan=lifespan,
         docs_url="/docs",

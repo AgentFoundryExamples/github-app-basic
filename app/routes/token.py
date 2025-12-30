@@ -122,10 +122,25 @@ Returns JSON with:
             "description": "Token retrieved successfully (may have been refreshed)",
             "content": {
                 "application/json": {
-                    "example": {
-                        "access_token": "gho_ExampleToken123...",
-                        "token_type": "bearer",
-                        "expires_at": "2025-12-31T23:59:59+00:00"
+                    "examples": {
+                        "non_expiring_token": {
+                            "summary": "Non-expiring GitHub token",
+                            "description": "Most GitHub user-to-server tokens do not expire",
+                            "value": {
+                                "access_token": "gho_ExampleToken123...",
+                                "token_type": "bearer",
+                                "expires_at": None
+                            }
+                        },
+                        "expiring_token": {
+                            "summary": "Expiring GitHub token",
+                            "description": "Some tokens may have expiration dates",
+                            "value": {
+                                "access_token": "gho_ExampleToken456...",
+                                "token_type": "bearer",
+                                "expires_at": "2025-12-31T23:59:59+00:00"
+                            }
+                        }
                     }
                 }
             }
