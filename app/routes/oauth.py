@@ -19,6 +19,7 @@ Provides:
 """
 
 import secrets
+import re
 from typing import Optional
 from urllib.parse import urlencode
 
@@ -150,9 +151,8 @@ async def github_install(
         
         # Validate and sanitize scopes parameter
         # Only allow alphanumeric, comma, colon, underscore, and hyphen
-        import re
         scopes_param = scopes.strip()
-        if not re.match(r'^[a-zA-Z0-9_:,\-]+$', scopes_param):
+        if not re.match(r'^[a-zA-Z0-9_:,-]+$', scopes_param):
             logger.warning(
                 "Invalid scope format provided",
                 extra={"extra_fields": {
