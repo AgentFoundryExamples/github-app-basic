@@ -1,0 +1,74 @@
+{
+  "type": "directory",
+  "name": "agent-foundry-template",
+  "children": [
+    {
+      "type": "directory",
+      "name": ".github",
+      "children": [
+        {
+          "type": "directory",
+          "name": "af-config",
+          "children": [
+            {
+              "type": "file",
+              "name": "license-header.config.json"
+            },
+            {
+              "type": "file",
+              "name": "LICENSE_HEADER"
+            },
+            {
+              "type": "file",
+              "name": "repo-analyzer.config.json"
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "repo-analysis-output",
+          "children": [
+            {
+              "type": "file",
+              "name": "dependencies.json"
+            },
+            {
+              "type": "file",
+              "name": "dependencies.md"
+            },
+            {
+              "type": "file",
+              "name": "SUMMARY.md"
+            },
+            {
+              "type": "file",
+              "name": "tree.json"
+            },
+            {
+              "type": "file",
+              "name": "tree.md"
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "workflows",
+          "children": [
+            {
+              "type": "file",
+              "name": "af_maintenance.yml"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "LICENSE"
+    },
+    {
+      "type": "file",
+      "name": "README.md"
+    }
+  ]
+}
