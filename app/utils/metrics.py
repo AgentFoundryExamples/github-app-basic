@@ -20,6 +20,57 @@ GitHub installation events, and HTTP request patterns.
 from typing import Dict, Optional
 from collections import defaultdict
 import threading
+import re
+
+
+import re
+
+
+# Prometheus label validation pattern (alphanumeric and underscore only)
+_LABEL_KEY_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
+
+def _validate_label_key(key: str) -> bool:
+    """Validate that a label key is a valid Prometheus identifier.
+    
+    Prometheus label keys must match [a-zA-Z_][a-zA-Z0-9_]*
+    
+    Args:
+        key: Label key to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    return _LABEL_KEY_PATTERN.match(key) is not None
+
+
+def _sanitize_label_value(value: str, max_length: int = 256) -> str:
+    """Sanitize a label value to prevent injection attacks and limit cardinality.
+    
+    - Truncates to max_length characters
+    - Replaces newlines and control characters with spaces
+    - Escapes backslashes and quotes for Prometheus format
+    
+    Args:
+        value: Label value to sanitize
+        max_length: Maximum length for the value
+        
+    Returns:
+        Sanitized label value
+    """
+    if not isinstance(value, str):
+        value = str(value)
+    
+    # Truncate to prevent excessive cardinality
+    value = value[:max_length]
+    
+    # Replace control characters and newlines with spaces
+    value = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', value)
+    
+    # Escape backslashes and quotes for Prometheus format
+    value = value.replace('\\', '\\\\').replace('"', '\\"')
+    
+    return value
 
 
 class MetricsCollector:
@@ -41,10 +92,25 @@ class MetricsCollector:
             metric_name: Name of the metric to increment
             value: Amount to increment by (default: 1)
             labels: Optional dictionary of labels for the metric
+            
+        Raises:
+            ValueError: If label keys are invalid Prometheus identifiers
         """
-        # Build metric key with labels
+        # Validate and sanitize labels
         if labels:
-            label_str = ",".join(f'{k}="{v}"' for k, v in sorted(labels.items()))
+            validated_labels = {}
+            for key, val in labels.items():
+                # Validate label key
+                if not _validate_label_key(key):
+                    raise ValueError(
+                        f"Invalid Prometheus label key '{key}'. "
+                        "Label keys must match [a-zA-Z_][a-zA-Z0-9_]*"
+                    )
+                # Sanitize label value
+                validated_labels[key] = _sanitize_label_value(val)
+            
+            # Build metric key with validated labels
+            label_str = ",".join(f'{k}="{v}"' for k, v in sorted(validated_labels.items()))
             key = f"{metric_name}{{{label_str}}}"
         else:
             key = metric_name
@@ -62,8 +128,18 @@ class MetricsCollector:
         Returns:
             Current counter value
         """
+        # Validate and sanitize labels (same as increment)
         if labels:
-            label_str = ",".join(f'{k}="{v}"' for k, v in sorted(labels.items()))
+            validated_labels = {}
+            for key, val in labels.items():
+                if not _validate_label_key(key):
+                    raise ValueError(
+                        f"Invalid Prometheus label key '{key}'. "
+                        "Label keys must match [a-zA-Z_][a-zA-Z0-9_]*"
+                    )
+                validated_labels[key] = _sanitize_label_value(val)
+            
+            label_str = ",".join(f'{k}="{v}"' for k, v in sorted(validated_labels.items()))
             key = f"{metric_name}{{{label_str}}}"
         else:
             key = metric_name

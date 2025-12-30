@@ -33,6 +33,22 @@ from app.utils.metrics import (
 )
 
 
+@pytest.fixture(autouse=True)
+def reset_metrics_state():
+    """Fixture to reset global metrics state before and after each test.
+    
+    This prevents test interdependencies by ensuring metrics are disabled
+    and cleaned up between tests.
+    """
+    # Setup: disable metrics before each test
+    init_metrics(enabled=False)
+    
+    yield
+    
+    # Teardown: disable metrics after each test
+    init_metrics(enabled=False)
+
+
 class TestStructuredLogging:
     """Test suite for structured logging functionality."""
     
@@ -173,6 +189,44 @@ class TestMetricsCollector:
         
         # Should have incremented 10,000 times total
         assert collector.get_counter("concurrent_counter") == 10000
+    
+    def test_metrics_collector_validates_label_keys(self):
+        """Test that invalid label keys raise ValueError."""
+        collector = MetricsCollector()
+        
+        # Invalid label keys should raise ValueError
+        with pytest.raises(ValueError, match="Invalid Prometheus label key"):
+            collector.increment("test_metric", labels={"invalid-key": "value"})
+        
+        with pytest.raises(ValueError, match="Invalid Prometheus label key"):
+            collector.increment("test_metric", labels={"123invalid": "value"})
+        
+        # Valid label keys should work
+        collector.increment("test_metric", labels={"valid_key": "value"})
+        assert collector.get_counter("test_metric", labels={"valid_key": "value"}) == 1
+    
+    def test_metrics_collector_sanitizes_label_values(self):
+        """Test that label values are sanitized."""
+        collector = MetricsCollector()
+        
+        # Label value with control characters should be sanitized
+        collector.increment("test_metric", labels={"key": "value\nwith\nnewlines"})
+        
+        # Should be able to retrieve with sanitized value
+        export = collector.export_prometheus()
+        # Newlines should be replaced with spaces
+        assert "value with newlines" in export
+    
+    def test_metrics_collector_escapes_special_characters(self):
+        """Test that special characters in label values are escaped."""
+        collector = MetricsCollector()
+        
+        # Label value with quotes and backslashes
+        collector.increment("test_metric", labels={"key": 'value"with"quotes'})
+        
+        export = collector.export_prometheus()
+        # Quotes should be escaped
+        assert 'value\\"with\\"quotes' in export
 
 
 class TestMetricsGlobalFunctions:

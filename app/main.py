@@ -241,7 +241,12 @@ The bearer token referenced is a GCP identity token, not the GitHub access token
             # Get request ID from state
             request_id = getattr(request.state, "request_id", None)
             
-            # Log structured request event
+            # Get route template to avoid high cardinality in metrics
+            # Use the route pattern instead of actual path to prevent unique paths
+            route = request.scope.get("route")
+            path_template = route.path if route else request.url.path
+            
+            # Log structured request event (use actual path for logging)
             log_structured_event(
                 logger,
                 "info",
@@ -254,12 +259,12 @@ The bearer token referenced is a GCP identity token, not the GitHub access token
                 request_id=request_id
             )
             
-            # Increment metrics counter if enabled
+            # Increment metrics counter if enabled (use path template for low cardinality)
             increment_counter(
                 METRIC_HTTP_REQUESTS_TOTAL,
                 labels={
                     "method": request.method,
-                    "path": request.url.path,
+                    "path": path_template,
                     "status": str(response.status_code)
                 }
             )
@@ -308,11 +313,26 @@ Export Prometheus-compatible metrics for monitoring.
 - `github_oauth_flows_started_total`: OAuth flows initiated
 - `github_oauth_flows_completed_total`: OAuth flows completed successfully
 - `github_oauth_flows_failed_total`: OAuth flows that failed
-- `http_requests_total`: HTTP requests (if request logging enabled)
+- `http_requests_total`: HTTP requests by method/path/status (if request logging enabled)
 
-**Security Note:**
-This endpoint is publicly accessible but does not expose sensitive data.
-Consider adding authentication or disabling in production if not needed.
+**⚠️ Security Warning:**
+This endpoint is **NOT** protected by Cloud Run IAM authentication by default.
+It will be publicly accessible when metrics are enabled.
+
+**Production Deployment:**
+For production deployments, you should either:
+1. Keep `ENABLE_METRICS=false` (recommended default) and use Cloud Monitoring instead
+2. Add authentication middleware to protect this endpoint
+3. Use a separate metrics scraper with proper authentication
+4. Deploy with network-level access controls
+
+**Data Exposure:**
+This endpoint exposes aggregated counters and does not contain:
+- Tokens or credentials
+- PII or user data
+- Internal configuration details
+
+However, request patterns and error rates may provide information about system behavior.
             """,
             response_class=PlainTextResponse,
             tags=["observability"]
