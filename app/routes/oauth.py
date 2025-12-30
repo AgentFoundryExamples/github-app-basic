@@ -447,7 +447,7 @@ async def oauth_callback(
                 content=_render_error_page(
                     title="Token Exchange Failed",
                     message="Failed to exchange authorization code for access token",
-                    details="Please try again or contact support if the issue persists."
+                    details=f"Please try again or contact support if the issue persists. (Correlation ID: {correlation_id})"
                 ),
                 status_code=500
             )

@@ -155,6 +155,23 @@ class TestDetectSensitiveString:
         """Test not detecting non-string values."""
         assert not detect_sensitive_string(12345)
         assert not detect_sensitive_string(None)
+    
+    def test_detect_short_secret_in_key_value(self):
+        """Test detecting short secrets (4+ chars) in key-value format."""
+        assert detect_sensitive_string("password=abcd")
+        assert detect_sensitive_string("api_key:test")
+        assert detect_sensitive_string('secret="xyz1"')
+    
+    def test_detect_json_style_secrets(self):
+        """Test detecting secrets in JSON format."""
+        assert detect_sensitive_string('{"token":"secretvalue"}')
+        assert detect_sensitive_string('{"password":"pass"}')
+    
+    def test_not_match_word_token_without_delimiter(self):
+        """Test not matching the word 'token' without a key-value delimiter."""
+        # "token" as a word should not trigger, only "token=" or "token:" patterns
+        assert not detect_sensitive_string("Failed with token")
+        assert not detect_sensitive_string("the token is invalid")
 
 
 class TestRedactDict:

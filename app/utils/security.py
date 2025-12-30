@@ -24,12 +24,17 @@ from typing import Any, Dict, List, Union, Optional
 
 
 # Patterns that indicate sensitive data
-SENSITIVE_PATTERNS = [
+# Compiled patterns for better performance
+_SENSITIVE_PATTERNS_RAW = [
     r'gh[pousr]_[A-Za-z0-9_-]{4,}',  # GitHub tokens (ghp_, gho_, ghs_, ghu_) - at least 4 chars after prefix
     r'[A-Za-z0-9]{40}',  # Generic 40-character tokens (like GitHub classic tokens)
     r'-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----',  # PEM keys
-    r'(?:password|passwd|pwd|secret|api[_-]?key|token|auth)["\s:=]+[A-Za-z0-9+/=]{8,}',  # Key-value pairs
+    r'(?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|bearer)["\s]*[:=]["\s]*\S{4,}',  # Key-value pairs with = or : delimiter (min 4 chars)
+    r'\{["\'](?:password|passwd|pwd|secret|api[_-]?key|token|auth)["\']\s*:\s*["\'][^"\']+["\']\}',  # JSON-style key-value pairs
 ]
+
+# Compile patterns once for performance
+SENSITIVE_PATTERNS = [re.compile(pattern, re.IGNORECASE) for pattern in _SENSITIVE_PATTERNS_RAW]
 
 # Fields that should be redacted (case-insensitive)
 SENSITIVE_FIELD_NAMES = {
@@ -89,24 +94,22 @@ def redact_token(
     
     token_len = len(token_str)
     
-    # For very short strings, just show first few chars
-    if token_len <= max(prefix_len, suffix_len):
-        visible = min(token_len - 1, 4) if token_len > 1 else 0
-        return token_str[:visible] + mask_char
-    
-    # If suffix_len is 0, don't show suffix
+    # If suffix_len is 0, always show only the prefix. This should be checked first.
     if suffix_len == 0:
         if token_len <= prefix_len:
-            return token_str[:prefix_len] + (mask_char * 3)
+            # For very short strings, show a smaller prefix to avoid leaking the whole token
+            visible = min(token_len - 1, 4) if token_len > 1 else 0
+            return token_str[:visible] + (mask_char * 3)
         masked_len = token_len - prefix_len
         middle = "." * 3 if masked_len < 10 else f".{masked_len}."
         return f"{token_str[:prefix_len]}{middle}"
     
-    # Standard case: show prefix and suffix
+    # For very short strings, just show first few chars
     if token_len <= prefix_len + suffix_len:
-        # Not enough chars for both prefix and suffix
-        return token_str[:prefix_len] + (mask_char * 3)
+        visible = min(token_len - 1, 4) if token_len > 1 else 0
+        return token_str[:visible] + (mask_char * 3)
     
+    # Standard case: show prefix and suffix
     # Show prefix and suffix with ellipsis
     masked_len = token_len - prefix_len - suffix_len
     middle = "." * 3 if masked_len < 10 else f".{masked_len}."
@@ -134,7 +137,7 @@ def detect_sensitive_string(value: str) -> bool:
         return False
     
     for pattern in SENSITIVE_PATTERNS:
-        if re.search(pattern, value, re.IGNORECASE):
+        if pattern.search(value):
             return True
     
     return False
@@ -265,7 +268,7 @@ def sanitize_exception_message(exception: Exception) -> str:
     
     # Apply pattern-based redaction to the message
     for pattern in SENSITIVE_PATTERNS:
-        message = re.sub(pattern, "[REDACTED]", message, flags=re.IGNORECASE)
+        message = pattern.sub("[REDACTED]", message)
     
     return message
 
