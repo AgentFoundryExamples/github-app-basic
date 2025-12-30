@@ -174,11 +174,14 @@ class TestHealthEndpoint:
             # Mock Firestore as healthy
             mock_client = AsyncMock()
             
-            async def mock_collections():
-                class MockAsyncIterator:
-                    def __aiter__(self):
-        
-        mock_client.collections = lambda: MockAsyncIterator()
+            class MockAsyncIterator:
+                def __aiter__(self):
+                    return self
+                
+                async def __anext__(self):
+                    raise StopAsyncIteration
+            
+            mock_client.collections = lambda: MockAsyncIterator()
             mock_get_client.return_value = mock_client
             
             response = client_no_github_config.get("/healthz")
