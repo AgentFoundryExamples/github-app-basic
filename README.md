@@ -275,11 +275,15 @@ Returns: `{"status": "ok"}`
 
 Used by load balancers and monitoring tools to verify service health.
 
-### GitHub App Installation (OAuth Initiation)
+### GitHub App OAuth Authorization (Initiation)
 ```
 GET /github/install
 ```
-Initiates the OAuth flow by redirecting to GitHub's authorization page.
+Initiates the OAuth user authorization flow for a GitHub App by redirecting to GitHub's authorization page.
+
+**Note on Terminology:** This endpoint uses "install" in its path for historical reasons, but it actually 
+initiates an OAuth user authorization flow (not a GitHub App installation to an org/repo). The flow 
+grants the app permission to act on behalf of the authenticated user with the requested scopes.
 
 **⚠️ Interactive Use Only:** This endpoint must be opened in a web browser, not called via API clients.
 
@@ -651,10 +655,17 @@ You may need to regenerate OAuth credentials if they're compromised or as part o
    # Or use escaped newlines
    GITHUB_APP_PRIVATE_KEY_PEM="-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----"
    
-   # Cloud Run: Update environment variable (use Secret Manager for production)
+   # Cloud Run: Update environment variable
+   # For production, it is STRONGLY recommended to use Google Secret Manager.
+   # The following command is for non-production environments only.
+   
+   # 1. Read the key into a variable
+   PEM_CONTENT=$(cat path/to/your-private-key.pem)
+   
+   # 2. Update the service, ensuring the variable is quoted
    gcloud run services update github-app-token-service \
      --region us-central1 \
-     --update-env-vars GITHUB_APP_PRIVATE_KEY_PEM="$(cat path/to/private-key.pem)" \
+     --set-env-vars="GITHUB_APP_PRIVATE_KEY_PEM=$PEM_CONTENT" \
      --project your-gcp-project-id
    ```
 

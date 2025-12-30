@@ -36,9 +36,14 @@ router = APIRouter()
 
 @router.get(
     "/github/install",
-    summary="Initiate GitHub App Installation",
+    summary="Initiate GitHub App OAuth Authorization",
     description="""
-Initiates the GitHub App OAuth installation flow by redirecting to GitHub's authorization page.
+Initiates the OAuth user authorization flow for a GitHub App by redirecting to GitHub's authorization page.
+
+**Note on Terminology:** This endpoint name uses "install" for historical reasons, but it initiates 
+an OAuth user authorization flow, not a GitHub App installation. The flow grants the app permission 
+to act on behalf of the authenticated user. For actual app installation to organizations/repos, 
+see GitHub's installation endpoints (not implemented in this service).
 
 **⚠️ Interactive Use Only:** This endpoint is designed for interactive browser use only. 
 It initiates an OAuth flow that requires user interaction in a web browser. 
@@ -143,8 +148,20 @@ async def github_install(
         # Generate CSRF state token
         state = GitHubOAuthManager.generate_state_token()
         
-        # Get scopes from query parameter or use defaults
-        scopes_param = scopes
+        # Validate and sanitize scopes parameter
+        # Only allow alphanumeric, comma, colon, underscore, and hyphen
+        import re
+        scopes_param = scopes.strip()
+        if not re.match(r'^[a-zA-Z0-9_:,\-]+$', scopes_param):
+            logger.warning(
+                "Invalid scope format provided",
+                extra={"extra_fields": {
+                    "correlation_id": correlation_id,
+                    "provided_scopes": scopes_param[:50]  # Truncate for security
+                }}
+            )
+            # Use safe default if invalid
+            scopes_param = "user:email,read:org"
         
         # Build GitHub OAuth authorization URL
         params = {
