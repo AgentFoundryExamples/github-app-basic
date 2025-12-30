@@ -14,7 +14,6 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app.config import get_settings, Settings
 from app.utils.logging import setup_logging, RequestIdFilter, get_logger
@@ -119,10 +118,15 @@ def create_app() -> FastAPI:
     
     # Optional CORS middleware (disabled by default)
     if settings.enable_cors:
-        logger.warning("CORS is enabled - ensure this is intended for your environment")
+        logger.warning(
+            "CORS is enabled - ensure this is intended for your environment. "
+            "IMPORTANT: Using wildcard (*) origins is a security risk in production. "
+            "Configure specific allowed origins before deploying to production."
+        )
+        # TODO: Add CORS_ALLOWED_ORIGINS config and replace ["*"] with specific origins for production
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],  # TODO: Configure specific origins for production
+            allow_origins=["*"],  # SECURITY: Wildcard allows all origins - configure specific origins for production
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],

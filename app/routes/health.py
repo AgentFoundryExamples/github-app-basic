@@ -1,6 +1,6 @@
 """Health check endpoint for the service."""
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter
 from typing import Dict
 import logging
 
