@@ -349,7 +349,7 @@ class TestFirestoreEmulatorCompatibility:
         mock_doc.to_dict.return_value = {"test": "data"}
         
         mock_doc_ref = Mock()
-        mock_doc_ref.get.return_value = mock_doc
+        mock_doc_ref.get = AsyncMock(return_value=mock_doc)
         
         mock_collection = Mock()
         mock_collection.document.return_value = mock_doc_ref
