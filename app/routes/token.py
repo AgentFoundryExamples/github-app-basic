@@ -385,20 +385,54 @@ async def get_token(
         return TokenResponse(
             access_token=token_data["access_token"],
             token_type=token_data.get("token_type", "bearer"),
-            expires_at=token_data.get("expires_at")
+            expires_at=expires_at.isoformat() if expires_at else None
         )
         
     except HTTPException:
-        # Re-raise HTTP exceptions (404, 500)
+        # Re-raise HTTP exceptions (404, 500, 503)
         raise
         
+    except PermissionError as e:
+        # Firestore permission error - return 503
+        logger.error(
+            "Permission denied accessing Firestore",
+            extra={"extra_fields": {
+                "error": str(e),
+                "error_type": type(e).__name__
+            }},
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Firestore service is temporarily unavailable"
+        )
+        
     except Exception as e:
-        # Unexpected error retrieving token
+        # Check if it's a Firestore connectivity/API error
+        error_type = type(e).__name__
+        error_str = str(e).lower()
+        
+        # Firestore-related errors should return 503
+        if any(keyword in error_str for keyword in ["firestore", "connection", "unavailable", "timeout"]):
+            logger.error(
+                "Firestore service error",
+                extra={"extra_fields": {
+                    "error": str(e),
+                    "error_type": error_type
+                }},
+                exc_info=True
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="Firestore service is temporarily unavailable"
+            )
+        
+        # Other unexpected errors return 500
         logger.error(
             "Failed to retrieve token",
             extra={"extra_fields": {
                 "error": str(e),
-                "error_type": type(e).__name__
+                "error_type": error_type
             }},
             exc_info=True
         )

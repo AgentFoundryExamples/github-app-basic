@@ -578,3 +578,92 @@ class TestTokenEndpointParameterPrecedence:
         # Assert - no refresh should have been attempted
         assert response.status_code == 200
         mock_refresh.assert_not_called()
+
+
+class TestTokenEndpointFirestoreErrors:
+    """Test Firestore error handling."""
+    
+    def test_firestore_permission_error_returns_503(self, client, mock_firestore_client):
+        """Test that Firestore permission errors return 503."""
+        # Mock permission error
+        mock_firestore_client.collection.return_value.document.return_value.get = AsyncMock(
+            side_effect=PermissionError("Permission denied accessing Firestore")
+        )
+        
+        # Execute
+        response = client.post("/api/token")
+        
+        # Assert
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Firestore service is temporarily unavailable"
+    
+    def test_firestore_connection_error_returns_503(self, client, mock_firestore_client):
+        """Test that Firestore connection errors return 503."""
+        # Mock connection error
+        mock_firestore_client.collection.return_value.document.return_value.get = AsyncMock(
+            side_effect=Exception("Firestore connection failed")
+        )
+        
+        # Execute
+        response = client.post("/api/token")
+        
+        # Assert
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Firestore service is temporarily unavailable"
+    
+    def test_generic_error_returns_500(self, client, mock_firestore_client):
+        """Test that generic errors return 500."""
+        # Mock generic error (not Firestore-related)
+        mock_firestore_client.collection.return_value.document.return_value.get = AsyncMock(
+            side_effect=Exception("Unexpected error occurred")
+        )
+        
+        # Execute
+        response = client.post("/api/token")
+        
+        # Assert
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to retrieve token"
+
+
+class TestTokenEndpointConsistentResponse:
+    """Test consistent datetime formatting in responses."""
+    
+    def test_expires_at_formatted_consistently(self, client, mock_firestore_client, test_settings):
+        """Test that expires_at is formatted consistently as ISO-8601 in response."""
+        from app.dao.firestore_dao import FirestoreDAO
+        
+        dao = FirestoreDAO(mock_firestore_client, encryption_key=test_settings.github_token_encryption_key)
+        
+        token = "gho_test_token"
+        encrypted_token = dao._encrypt_token(token)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=8)
+        
+        mock_doc = Mock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = {
+            "access_token": encrypted_token,
+            "token_type": "bearer",
+            "scope": "repo",
+            "expires_at": expires_at.isoformat(),
+            "refresh_token": None,
+            "last_refresh_attempt": None,
+            "last_refresh_status": None,
+            "last_refresh_error": None,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        mock_firestore_client.collection.return_value.document.return_value.get = AsyncMock(return_value=mock_doc)
+        
+        # Execute
+        response = client.post("/api/token")
+        
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify the expires_at is in ISO-8601 format
+        assert data["expires_at"] == expires_at.isoformat()
+        # Verify it can be parsed back
+        parsed = datetime.fromisoformat(data["expires_at"])
+        assert parsed == expires_at
