@@ -1,10 +1,187 @@
 {
-  "nodes": [],
-  "edges": [],
+  "nodes": [
+    {
+      "id": "app/__init__.py",
+      "path": "app/__init__.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [],
+        "third-party": []
+      }
+    },
+    {
+      "id": "app/config.py",
+      "path": "app/config.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "typing.Optional"
+        ],
+        "third-party": [
+          "pydantic.Field",
+          "pydantic.ValidationError",
+          "pydantic.field_validator",
+          "pydantic_settings.BaseSettings",
+          "pydantic_settings.SettingsConfigDict"
+        ]
+      }
+    },
+    {
+      "id": "app/main.py",
+      "path": "app/main.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "contextlib.asynccontextmanager",
+          "logging",
+          "os",
+          "typing.AsyncIterator"
+        ],
+        "third-party": [
+          "fastapi.FastAPI",
+          "fastapi.Request",
+          "fastapi.middleware.cors.CORSMiddleware",
+          "uvicorn"
+        ]
+      }
+    },
+    {
+      "id": "app/routes/__init__.py",
+      "path": "app/routes/__init__.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [],
+        "third-party": []
+      }
+    },
+    {
+      "id": "app/routes/health.py",
+      "path": "app/routes/health.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "logging",
+          "typing.Dict"
+        ],
+        "third-party": [
+          "fastapi.APIRouter"
+        ]
+      }
+    },
+    {
+      "id": "app/utils/__init__.py",
+      "path": "app/utils/__init__.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [],
+        "third-party": []
+      }
+    },
+    {
+      "id": "app/utils/logging.py",
+      "path": "app/utils/logging.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "contextvars.ContextVar",
+          "logging",
+          "sys",
+          "typing.Any",
+          "typing.Dict",
+          "typing.Optional"
+        ],
+        "third-party": [
+          "pythonjsonlogger.jsonlogger"
+        ]
+      }
+    },
+    {
+      "id": "tests/__init__.py",
+      "path": "tests/__init__.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [],
+        "third-party": []
+      }
+    },
+    {
+      "id": "tests/test_config.py",
+      "path": "tests/test_config.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [],
+        "third-party": [
+          "pytest"
+        ]
+      }
+    },
+    {
+      "id": "tests/test_health.py",
+      "path": "tests/test_health.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [],
+        "third-party": [
+          "fastapi.testclient.TestClient",
+          "pytest"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "app/main.py",
+      "target": "app/config.py"
+    },
+    {
+      "source": "app/main.py",
+      "target": "app/utils/logging.py"
+    },
+    {
+      "source": "app/main.py",
+      "target": "app/routes/health.py"
+    },
+    {
+      "source": "tests/test_config.py",
+      "target": "app/config.py"
+    },
+    {
+      "source": "tests/test_health.py",
+      "target": "app/main.py"
+    },
+    {
+      "source": "tests/test_health.py",
+      "target": "app/config.py"
+    }
+  ],
   "external_dependencies_summary": {
-    "stdlib": [],
-    "third-party": [],
-    "stdlib_count": 0,
-    "third-party_count": 0
+    "stdlib": [
+      "contextlib.asynccontextmanager",
+      "contextvars.ContextVar",
+      "logging",
+      "os",
+      "sys",
+      "typing.Any",
+      "typing.AsyncIterator",
+      "typing.Dict",
+      "typing.Optional"
+    ],
+    "third-party": [
+      "fastapi.APIRouter",
+      "fastapi.FastAPI",
+      "fastapi.Request",
+      "fastapi.middleware.cors.CORSMiddleware",
+      "fastapi.testclient.TestClient",
+      "pydantic.Field",
+      "pydantic.ValidationError",
+      "pydantic.field_validator",
+      "pydantic_settings.BaseSettings",
+      "pydantic_settings.SettingsConfigDict",
+      "pytest",
+      "pythonjsonlogger.jsonlogger",
+      "uvicorn"
+    ],
+    "stdlib_count": 9,
+    "third-party_count": 13
   }
 }

@@ -1,0 +1,146 @@
+{
+  "schema_version": "2.0",
+  "total_files": 10,
+  "files": [
+    {
+      "schema_version": "2.0",
+      "path": "app/__init__.py",
+      "language": "Python",
+      "role": "module-init",
+      "role_justification": "module initialization file '__init__'",
+      "summary": "Python module initialization (role: module-init)",
+      "summary_text": "Python module initialization (role: module-init)",
+      "metrics": {
+        "size_bytes": 620,
+        "loc": 1,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/config.py",
+      "language": "Python",
+      "role": "configuration",
+      "role_justification": "configuration file name 'config'",
+      "summary": "Python configuration file (role: configuration)",
+      "summary_text": "Python configuration file (role: configuration)",
+      "metrics": {
+        "size_bytes": 4157,
+        "loc": 71,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/main.py",
+      "language": "Python",
+      "role": "entry-point",
+      "role_justification": "common entry point name 'main'",
+      "summary": "Python main entry point (role: entry-point)",
+      "summary_text": "Python main entry point (role: entry-point)",
+      "metrics": {
+        "size_bytes": 5259,
+        "loc": 104,
+        "todo_count": 1
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/routes/__init__.py",
+      "language": "Python",
+      "role": "module-init",
+      "role_justification": "module initialization file '__init__'",
+      "summary": "Python module initialization (role: module-init)",
+      "summary_text": "Python module initialization (role: module-init)",
+      "metrics": {
+        "size_bytes": 615,
+        "loc": 1,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/routes/health.py",
+      "language": "Python",
+      "role": "implementation",
+      "role_justification": "general implementation file (default classification)",
+      "summary": "Python module for health",
+      "summary_text": "Python module for health",
+      "metrics": {
+        "size_bytes": 994,
+        "loc": 14,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/utils/__init__.py",
+      "language": "Python",
+      "role": "module-init",
+      "role_justification": "module initialization file '__init__'",
+      "summary": "Python module initialization (role: module-init)",
+      "summary_text": "Python module initialization (role: module-init)",
+      "metrics": {
+        "size_bytes": 618,
+        "loc": 1,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "app/utils/logging.py",
+      "language": "Python",
+      "role": "implementation",
+      "role_justification": "general implementation file (default classification)",
+      "summary": "Python module for logging",
+      "summary_text": "Python module for logging",
+      "metrics": {
+        "size_bytes": 3383,
+        "loc": 58,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "tests/__init__.py",
+      "language": "Python",
+      "role": "test",
+      "role_justification": "located in 'tests' directory",
+      "summary": "Python test module initialization (role: test)",
+      "summary_text": "Python test module initialization (role: test)",
+      "metrics": {
+        "size_bytes": 614,
+        "loc": 1,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "tests/test_config.py",
+      "language": "Python",
+      "role": "test",
+      "role_justification": "filename starts with 'test_'",
+      "summary": "Python test file (role: test)",
+      "summary_text": "Python test file (role: test)",
+      "metrics": {
+        "size_bytes": 2576,
+        "loc": 33,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
+      "path": "tests/test_health.py",
+      "language": "Python",
+      "role": "test",
+      "role_justification": "filename starts with 'test_'",
+      "summary": "Python test file (role: test)",
+      "summary_text": "Python test file (role: test)",
+      "metrics": {
+        "size_bytes": 6117,
+        "loc": 104,
+        "todo_count": 0
+      }
+    }
+  ]
+}

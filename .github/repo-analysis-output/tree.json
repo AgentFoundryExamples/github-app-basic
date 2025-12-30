@@ -63,12 +63,96 @@
       ]
     },
     {
+      "type": "directory",
+      "name": "app",
+      "children": [
+        {
+          "type": "directory",
+          "name": "routes",
+          "children": [
+            {
+              "type": "file",
+              "name": "__init__.py"
+            },
+            {
+              "type": "file",
+              "name": "health.py"
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "utils",
+          "children": [
+            {
+              "type": "file",
+              "name": "__init__.py"
+            },
+            {
+              "type": "file",
+              "name": "logging.py"
+            }
+          ]
+        },
+        {
+          "type": "file",
+          "name": "__init__.py"
+        },
+        {
+          "type": "file",
+          "name": "config.py"
+        },
+        {
+          "type": "file",
+          "name": "main.py"
+        }
+      ]
+    },
+    {
+      "type": "directory",
+      "name": "tests",
+      "children": [
+        {
+          "type": "file",
+          "name": "__init__.py"
+        },
+        {
+          "type": "file",
+          "name": "test_config.py"
+        },
+        {
+          "type": "file",
+          "name": "test_health.py"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": ".env.example"
+    },
+    {
+      "type": "file",
+      "name": ".gitignore"
+    },
+    {
       "type": "file",
       "name": "LICENSE"
     },
     {
       "type": "file",
+      "name": "pyproject.toml"
+    },
+    {
+      "type": "file",
       "name": "README.md"
+    },
+    {
+      "type": "file",
+      "name": "requirements-dev.txt"
+    },
+    {
+      "type": "file",
+      "name": "requirements.txt"
     }
   ]
 }
