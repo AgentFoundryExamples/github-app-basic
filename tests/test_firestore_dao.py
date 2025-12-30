@@ -231,6 +231,39 @@ class TestFirestoreService:
         # Execute and verify
         with pytest.raises(Exception, match="Failed to initialize Firestore client"):
             get_firestore_client(settings)
+    
+    @patch('app.services.firestore.firestore.AsyncClient')
+    def test_get_firestore_client_thread_safe(self, mock_firestore_client):
+        """Test thread-safe initialization with concurrent access."""
+        import threading
+        
+        # Setup
+        mock_client_instance = Mock()
+        mock_firestore_client.return_value = mock_client_instance
+        
+        settings = Settings(
+            _env_file=None,
+            app_env="dev",
+            gcp_project_id="test-project"
+        )
+        
+        clients = []
+        
+        def get_client():
+            client = get_firestore_client(settings)
+            clients.append(client)
+        
+        # Execute multiple threads attempting to initialize concurrently
+        threads = [threading.Thread(target=get_client) for _ in range(5)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        
+        # Verify all threads got the same client instance (only initialized once)
+        assert len(clients) == 5
+        assert all(client == clients[0] for client in clients)
+        mock_firestore_client.assert_called_once()
 
 
 class TestFirestoreDependencyInjection:
@@ -273,6 +306,53 @@ class TestFirestoreDependencyInjection:
         
         assert exc_info.value.status_code == 503
         assert "configuration error" in exc_info.value.detail.lower()
+    
+    @patch('app.services.firestore.firestore.AsyncClient')
+    def test_firestore_dao_dependency_detailed_error_in_dev(self, mock_firestore_client):
+        """Test that detailed errors are exposed in dev environment."""
+        # Setup mock to raise an error during initialization
+        mock_firestore_client.side_effect = Exception("Detailed error message")
+        
+        settings = Settings(
+            _env_file=None,
+            app_env="dev",
+            gcp_project_id="test-project"
+        )
+        
+        # Execute and verify
+        with pytest.raises(HTTPException) as exc_info:
+            get_firestore_dao(settings)
+        
+        assert exc_info.value.status_code == 503
+        # In dev, detailed error should be exposed
+        assert "Detailed error message" in exc_info.value.detail
+    
+    @patch('app.services.firestore.firestore.AsyncClient')
+    def test_firestore_dao_dependency_generic_error_in_prod(self, mock_firestore_client):
+        """Test that generic errors are shown in production environment."""
+        # Setup mock to raise an error during initialization
+        mock_firestore_client.side_effect = Exception("Detailed error message")
+        
+        settings = Settings(
+            _env_file=None,
+            app_env="prod",
+            gcp_project_id="test-project",
+            # Add required prod fields to pass validation
+            github_app_id="test",
+            github_private_key="test",
+            github_client_id="test",
+            github_client_secret="test",
+            github_webhook_secret="test"
+        )
+        
+        # Execute and verify
+        with pytest.raises(HTTPException) as exc_info:
+            get_firestore_dao(settings)
+        
+        assert exc_info.value.status_code == 503
+        # In prod, generic error should be shown
+        assert exc_info.value.detail == "Firestore service is temporarily unavailable"
+        assert "Detailed error message" not in exc_info.value.detail
     
     @patch('app.services.firestore.firestore.AsyncClient')
     @patch('app.dependencies.firestore.get_firestore_client')

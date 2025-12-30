@@ -60,7 +60,13 @@ def get_firestore_dao(settings: Settings = Depends(get_settings)) -> FirestoreDA
         # Unexpected error during client initialization
         error_msg = f"Failed to initialize Firestore: {str(e)}"
         logger.error(error_msg, exc_info=True)
+        
+        # Expose detailed error in non-production environments for easier debugging
+        detail_msg = "Firestore service is temporarily unavailable"
+        if settings.app_env != "prod":
+            detail_msg = error_msg
+        
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Firestore service is temporarily unavailable"
+            detail=detail_msg
         )
