@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "total_files": 34,
+  "total_files": 35,
   "files": [
     {
       "schema_version": "2.0",
@@ -25,8 +25,8 @@
       "summary": "Python configuration file (role: configuration)",
       "summary_text": "Python configuration file (role: configuration)",
       "metrics": {
-        "size_bytes": 10591,
-        "loc": 197,
+        "size_bytes": 11913,
+        "loc": 229,
         "todo_count": 0
       }
     },
@@ -95,8 +95,8 @@
       "summary": "Python main entry point (role: entry-point)",
       "summary_text": "Python main entry point (role: entry-point)",
       "metrics": {
-        "size_bytes": 13339,
-        "loc": 261,
+        "size_bytes": 15017,
+        "loc": 288,
         "todo_count": 1
       }
     },
@@ -137,8 +137,8 @@
       "summary": "Python module for health",
       "summary_text": "Python module for health",
       "metrics": {
-        "size_bytes": 994,
-        "loc": 14,
+        "size_bytes": 10413,
+        "loc": 215,
         "todo_count": 0
       }
     },
@@ -214,6 +214,20 @@
     },
     {
       "schema_version": "2.0",
+      "path": "app/services/readiness.py",
+      "language": "Python",
+      "role": "implementation",
+      "role_justification": "general implementation file (default classification)",
+      "summary": "Python module for readiness",
+      "summary_text": "Python module for readiness",
+      "metrics": {
+        "size_bytes": 5059,
+        "loc": 105,
+        "todo_count": 0
+      }
+    },
+    {
+      "schema_version": "2.0",
       "path": "app/utils/__init__.py",
       "language": "Python",
       "role": "module-init",
@@ -249,8 +263,8 @@
       "summary": "Python module for metrics",
       "summary_text": "Python module for metrics",
       "metrics": {
-        "size_bytes": 8435,
-        "loc": 159,
+        "size_bytes": 8695,
+        "loc": 163,
         "todo_count": 0
       }
     },
@@ -389,8 +403,8 @@
       "summary": "Python test file (role: test)",
       "summary_text": "Python test file (role: test)",
       "metrics": {
-        "size_bytes": 6033,
-        "loc": 103,
+        "size_bytes": 20027,
+        "loc": 348,
         "todo_count": 0
       }
     },

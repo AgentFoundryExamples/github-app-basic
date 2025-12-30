@@ -139,11 +139,20 @@
       "type": "file",
       "external_dependencies": {
         "stdlib": [
-          "logging",
-          "typing.Dict"
+          "asyncio",
+          "datetime.datetime",
+          "datetime.timedelta",
+          "datetime.timezone",
+          "typing.Any",
+          "typing.Dict",
+          "typing.Optional"
         ],
         "third-party": [
-          "fastapi.APIRouter"
+          "fastapi.APIRouter",
+          "fastapi.Depends",
+          "fastapi.Request",
+          "fastapi.Response",
+          "fastapi.status"
         ]
       }
     },
@@ -241,6 +250,21 @@
           "httpx",
           "jwt"
         ]
+      }
+    },
+    {
+      "id": "app/services/readiness.py",
+      "path": "app/services/readiness.py",
+      "type": "file",
+      "external_dependencies": {
+        "stdlib": [
+          "datetime.datetime",
+          "datetime.timezone",
+          "threading.Lock",
+          "typing.Dict",
+          "typing.Optional"
+        ],
+        "third-party": []
       }
     },
     {
@@ -445,7 +469,14 @@
       "path": "tests/test_health.py",
       "type": "file",
       "external_dependencies": {
-        "stdlib": [],
+        "stdlib": [
+          "asyncio",
+          "datetime.datetime",
+          "datetime.timezone",
+          "unittest.mock.AsyncMock",
+          "unittest.mock.Mock",
+          "unittest.mock.patch"
+        ],
         "third-party": [
           "fastapi.testclient.TestClient",
           "pytest"
@@ -632,6 +663,14 @@
       "target": "app/routes/token.py"
     },
     {
+      "source": "app/main.py",
+      "target": "app/services/readiness.py"
+    },
+    {
+      "source": "app/main.py",
+      "target": "app/services/firestore.py"
+    },
+    {
       "source": "app/routes/admin.py",
       "target": "app/config.py"
     },
@@ -649,6 +688,34 @@
     },
     {
       "source": "app/routes/admin.py",
+      "target": "app/utils/security.py"
+    },
+    {
+      "source": "app/routes/health.py",
+      "target": "app/config.py"
+    },
+    {
+      "source": "app/routes/health.py",
+      "target": "app/dependencies/firestore.py"
+    },
+    {
+      "source": "app/routes/health.py",
+      "target": "app/services/firestore.py"
+    },
+    {
+      "source": "app/routes/health.py",
+      "target": "app/services/readiness.py"
+    },
+    {
+      "source": "app/routes/health.py",
+      "target": "app/utils/logging.py"
+    },
+    {
+      "source": "app/routes/health.py",
+      "target": "app/utils/metrics.py"
+    },
+    {
+      "source": "app/routes/health.py",
       "target": "app/utils/security.py"
     },
     {
@@ -726,6 +793,10 @@
     {
       "source": "app/services/github.py",
       "target": "app/utils/security.py"
+    },
+    {
+      "source": "app/services/readiness.py",
+      "target": "app/utils/logging.py"
     },
     {
       "source": "app/utils/logging.py",
@@ -773,7 +844,19 @@
     },
     {
       "source": "tests/test_health.py",
+      "target": "app/services/readiness.py"
+    },
+    {
+      "source": "tests/test_health.py",
+      "target": "app/services/firestore.py"
+    },
+    {
+      "source": "tests/test_health.py",
       "target": "app/config.py"
+    },
+    {
+      "source": "tests/test_health.py",
+      "target": "app/routes/health.py"
     },
     {
       "source": "tests/test_logging_and_metrics.py",

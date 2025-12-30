@@ -4,7 +4,7 @@ Heuristic summaries of source files based on filenames, extensions, and paths.
 
 Schema Version: 2.0
 
-Total files: 34
+Total files: 35
 
 ## app/__init__.py
 **Language:** Python  
@@ -20,8 +20,8 @@ Total files: 34
 **Role:** configuration  
 **Role Justification:** configuration file name 'config'  
 **Summary:** Python configuration file (role: configuration)  
-**Size:** 10.34 KB  
-**LOC:** 197  
+**Size:** 11.63 KB  
+**LOC:** 229  
 **TODOs/FIXMEs:** 0  
 
 ## app/dao/__init__.py
@@ -65,8 +65,8 @@ Total files: 34
 **Role:** entry-point  
 **Role Justification:** common entry point name 'main'  
 **Summary:** Python main entry point (role: entry-point)  
-**Size:** 13.03 KB  
-**LOC:** 261  
+**Size:** 14.67 KB  
+**LOC:** 288  
 **TODOs/FIXMEs:** 1  
 
 ## app/routes/__init__.py
@@ -92,8 +92,8 @@ Total files: 34
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for health  
-**Size:** 0.97 KB  
-**LOC:** 14  
+**Size:** 10.17 KB  
+**LOC:** 215  
 **TODOs/FIXMEs:** 0  
 
 ## app/routes/oauth.py
@@ -141,6 +141,15 @@ Total files: 34
 **LOC:** 560  
 **TODOs/FIXMEs:** 0  
 
+## app/services/readiness.py
+**Language:** Python  
+**Role:** implementation  
+**Role Justification:** general implementation file (default classification)  
+**Summary:** Python module for readiness  
+**Size:** 4.94 KB  
+**LOC:** 105  
+**TODOs/FIXMEs:** 0  
+
 ## app/utils/__init__.py
 **Language:** Python  
 **Role:** module-init  
@@ -164,8 +173,8 @@ Total files: 34
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for metrics  
-**Size:** 8.24 KB  
-**LOC:** 159  
+**Size:** 8.49 KB  
+**LOC:** 163  
 **TODOs/FIXMEs:** 0  
 
 ## app/utils/security.py
@@ -254,8 +263,8 @@ Total files: 34
 **Role:** test  
 **Role Justification:** filename starts with 'test_'  
 **Summary:** Python test file (role: test)  
-**Size:** 5.89 KB  
-**LOC:** 103  
+**Size:** 19.56 KB  
+**LOC:** 348  
 **TODOs/FIXMEs:** 0  
 
 ## tests/test_logging_and_metrics.py

@@ -8,8 +8,8 @@ Includes classification of external dependencies as stdlib vs third-party.
 
 ## Statistics
 
-- **Total files**: 34
-- **Intra-repo dependencies**: 65
+- **Total files**: 35
+- **Intra-repo dependencies**: 78
 - **External stdlib dependencies**: 33
 - **External third-party dependencies**: 36
 
@@ -69,26 +69,26 @@ Total: 36 unique packages
 
 ## Most Depended Upon Files (Intra-Repo)
 
-- `app/config.py` (12 dependents)
-- `app/utils/logging.py` (10 dependents)
-- `app/utils/security.py` (8 dependents)
+- `app/config.py` (13 dependents)
+- `app/utils/logging.py` (12 dependents)
+- `app/utils/security.py` (9 dependents)
 - `app/dao/firestore_dao.py` (8 dependents)
+- `app/dependencies/firestore.py` (6 dependents)
 - `app/services/github.py` (6 dependents)
-- `app/dependencies/firestore.py` (5 dependents)
+- `app/services/firestore.py` (5 dependents)
+- `app/utils/metrics.py` (5 dependents)
 - `app/main.py` (5 dependents)
-- `app/utils/metrics.py` (4 dependents)
-- `app/services/firestore.py` (2 dependents)
-- `app/routes/health.py` (1 dependents)
+- `app/services/readiness.py` (3 dependents)
 
 ## Files with Most Dependencies (Intra-Repo)
 
-- `app/main.py` (7 dependencies)
+- `app/main.py` (9 dependencies)
+- `app/routes/health.py` (7 dependencies)
 - `app/routes/oauth.py` (7 dependencies)
 - `app/routes/token.py` (7 dependencies)
 - `tests/test_firestore_dao.py` (6 dependencies)
 - `app/routes/admin.py` (5 dependencies)
+- `tests/test_health.py` (5 dependencies)
 - `app/dependencies/firestore.py` (4 dependencies)
 - `tests/test_logging_and_metrics.py` (4 dependencies)
 - `tests/test_oauth_flow.py` (4 dependencies)
-- `tests/test_token_endpoint.py` (4 dependencies)
-- `app/services/firestore.py` (3 dependencies)
