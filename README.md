@@ -71,7 +71,7 @@ PORT=8000              # Server port (default: 8000)
 LOG_LEVEL=INFO         # Logging level (default: INFO)
 
 # GCP
-REGION=us-central1     # GCP region (default: us-central1)
+REGION=us-central     # GCP region (default: us-central)
 
 # CORS
 ENABLE_CORS=false      # Enable CORS middleware (default: false)

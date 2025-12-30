@@ -16,7 +16,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings, Settings
-from app.utils.logging import setup_logging, RequestIdFilter, get_logger
+from app.utils.logging import setup_logging, request_id_var, get_logger
 from app.routes import health
 
 
@@ -101,18 +101,14 @@ def create_app() -> FastAPI:
         # Add to request state for downstream use
         request.state.request_id = request_id
         
-        # Add filter to logger for this request
-        if request_id:
-            log_filter = RequestIdFilter(request_id)
-            root_logger = logging.getLogger()
-            root_logger.addFilter(log_filter)
-            
-            try:
-                response = await call_next(request)
-            finally:
-                root_logger.removeFilter(log_filter)
-        else:
+        # Set the context variable for logging
+        token = request_id_var.set(request_id)
+        
+        try:
             response = await call_next(request)
+        finally:
+            # Reset the context variable to its previous state
+            request_id_var.reset(token)
         
         return response
     
@@ -127,7 +123,7 @@ def create_app() -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],  # SECURITY: Wildcard allows all origins - configure specific origins for production
-            allow_credentials=True,
+            allow_credentials=False,  # Disabled with wildcard origins to prevent security vulnerability
             allow_methods=["*"],
             allow_headers=["*"],
         )

@@ -5,8 +5,13 @@ Provides JSON-formatted logging with support for request tracing.
 
 import logging
 import sys
+from contextvars import ContextVar
 from typing import Any, Dict, Optional
 from pythonjsonlogger import jsonlogger
+
+
+# Context variable to store request ID for the current request
+request_id_var: ContextVar[Optional[str]] = ContextVar('request_id', default=None)
 
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
@@ -33,9 +38,10 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         log_record["logger"] = record.name
         log_record["message"] = record.getMessage()
         
-        # Add request_id if present in record
-        if hasattr(record, "request_id"):
-            log_record["request_id"] = record.request_id
+        # Add request_id from context variable if available
+        request_id = request_id_var.get()
+        if request_id:
+            log_record["request_id"] = request_id
         
         # Add any extra fields
         if hasattr(record, "extra_fields"):
@@ -69,32 +75,6 @@ def setup_logging(log_level: str = "INFO") -> None:
     
     # Reduce noise from third-party libraries
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-
-
-class RequestIdFilter(logging.Filter):
-    """Logging filter that adds request_id to log records."""
-    
-    def __init__(self, request_id: Optional[str] = None):
-        """Initialize the filter with an optional request_id.
-        
-        Args:
-            request_id: The request ID to add to all log records.
-        """
-        super().__init__()
-        self.request_id = request_id
-    
-    def filter(self, record: logging.LogRecord) -> bool:
-        """Add request_id to the record if available.
-        
-        Args:
-            record: The log record to modify.
-            
-        Returns:
-            Always True to allow the record through.
-        """
-        if self.request_id:
-            record.request_id = self.request_id
-        return True
 
 
 def get_logger(name: str) -> logging.Logger:

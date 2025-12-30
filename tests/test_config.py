@@ -20,7 +20,7 @@ class TestSettings:
         
         assert settings.app_env == "dev"
         assert settings.port == 8000
-        assert settings.region == "us-central1"
+        assert settings.region == "us-central"
         assert settings.log_level == "INFO"
         assert settings.enable_cors is False
     
@@ -33,12 +33,12 @@ class TestSettings:
         settings.validate_production_settings()
         assert settings.app_env == "dev"
     
-    def test_region_defaults_to_us_central1(self, monkeypatch):
-        """Test that region defaults to us-central1."""
+    def test_region_defaults_to_us_central(self, monkeypatch):
+        """Test that region defaults to us-central."""
         monkeypatch.delenv("REGION", raising=False)
         
         settings = Settings(_env_file=None)
-        assert settings.region == "us-central1"
+        assert settings.region == "us-central"
     
     def test_production_validation_with_missing_fields(self):
         """Test that production validation detects missing GitHub fields."""

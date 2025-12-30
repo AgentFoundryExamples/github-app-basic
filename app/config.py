@@ -30,7 +30,7 @@ class Settings(BaseSettings):
         default=None, 
         description="Path to GCP service account credentials JSON"
     )
-    region: str = Field(default="us-central1", description="GCP region")
+    region: str = Field(default="us-central", description="GCP region")
     
     # GitHub App Configuration
     github_app_id: Optional[str] = Field(default=None, description="GitHub App ID")
