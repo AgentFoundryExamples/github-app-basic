@@ -11,6 +11,8 @@ FastAPI-based service for minting GitHub App tokens with GCP integration, design
 - 📚 Auto-generated OpenAPI documentation (Swagger UI)
 - 🔒 Production environment validation
 - 🌐 Optional CORS middleware (disabled by default)
+- 🔐 OAuth token persistence with AES-256-GCM encryption in Firestore
+- 🛡️ Secure token storage with automated timestamp normalization (UTC ISO-8601)
 
 ## Prerequisites
 
@@ -816,6 +818,39 @@ app.include_router(my_route.router, tags=["my-tag"])
 ### Enabling CORS
 
 Set `ENABLE_CORS=true` in your environment. Note: This enables CORS for all origins. For production, modify `app/main.py` to specify allowed origins.
+
+### Management Scripts
+
+#### Reset GitHub Token
+
+The `scripts/reset_github_token.py` utility allows you to delete or reset OAuth tokens stored in Firestore during development and testing.
+
+**Usage:**
+
+```bash
+# Delete token using default collection/doc_id
+python scripts/reset_github_token.py
+
+# Delete token from custom location
+python scripts/reset_github_token.py --collection my_tokens --doc-id user123
+
+# Check if token exists without deleting (dry-run)
+python scripts/reset_github_token.py --dry-run
+
+# Quiet mode (suppress non-error output)
+python scripts/reset_github_token.py --quiet
+```
+
+**Environment Variables:**
+- `GCP_PROJECT_ID`: Required. Your GCP project ID
+- `GITHUB_TOKENS_COLLECTION`: Optional. Collection name (default: `github_tokens`)
+- `GITHUB_TOKENS_DOC_ID`: Optional. Document ID (default: `primary_user`)
+
+**Exit Codes:**
+- `0`: Success (token deleted or already non-existent)
+- `1`: Error (configuration or Firestore error)
+
+**Security:** The script never exposes token data in logs or output, only metadata about document existence.
 
 ## Troubleshooting
 

@@ -14,6 +14,7 @@
 """Tests for GitHub OAuth flows and JWT generation."""
 
 import time
+import secrets
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime, timedelta
@@ -369,6 +370,8 @@ class TestOAuthEndpoints:
         monkeypatch.setenv("GITHUB_CLIENT_SECRET", "test_secret")
         monkeypatch.setenv("GITHUB_APP_ID", "12345")
         monkeypatch.setenv("GITHUB_OAUTH_REDIRECT_URI", "http://localhost:8000/oauth/callback")
+        monkeypatch.setenv("GCP_PROJECT_ID", "test-project")
+        monkeypatch.setenv("GITHUB_TOKEN_ENCRYPTION_KEY", secrets.token_hex(32))
         
         from app import config
         original_settings = config.Settings
@@ -381,8 +384,19 @@ class TestOAuthEndpoints:
         # Clear state tokens before each test
         GitHubOAuthManager._state_tokens.clear()
         
+        # Create app and override Firestore DAO dependency
         app = create_app()
-        return TestClient(app)
+        
+        # Override the get_firestore_dao dependency with a mock
+        from app.dependencies.firestore import get_firestore_dao
+        mock_dao = Mock()
+        mock_dao.save_github_token = AsyncMock()
+        app.dependency_overrides[get_firestore_dao] = lambda: mock_dao
+        
+        yield TestClient(app)
+        
+        # Cleanup: clear dependency overrides to prevent test pollution
+        app.dependency_overrides.clear()
     
     def test_github_install_redirect(self, client):
         """Test /github/install redirects to GitHub with state."""
@@ -573,6 +587,8 @@ class TestOAuthIntegration:
         monkeypatch.setenv("GITHUB_CLIENT_SECRET", "test_secret")
         monkeypatch.setenv("GITHUB_APP_ID", "12345")
         monkeypatch.setenv("GITHUB_OAUTH_REDIRECT_URI", "http://localhost:8000/oauth/callback")
+        monkeypatch.setenv("GCP_PROJECT_ID", "test-project")
+        monkeypatch.setenv("GITHUB_TOKEN_ENCRYPTION_KEY", secrets.token_hex(32))
         
         from app import config
         original_settings = config.Settings
@@ -585,6 +601,13 @@ class TestOAuthIntegration:
         GitHubOAuthManager._state_tokens.clear()
         
         app = create_app()
+        
+        # Override the get_firestore_dao dependency with a mock
+        from app.dependencies.firestore import get_firestore_dao
+        mock_dao = Mock()
+        mock_dao.save_github_token = AsyncMock()
+        app.dependency_overrides[get_firestore_dao] = lambda: mock_dao
+        
         client = TestClient(app)
         
         # Step 1: Request installation redirect
@@ -618,3 +641,419 @@ class TestOAuthIntegration:
         
         assert callback_response.status_code == 200
         assert b"Authorization Successful" in callback_response.content
+
+
+class TestOAuthFirestorePersistence:
+    """Test suite for OAuth token persistence to Firestore."""
+    
+    @pytest.fixture
+    def client(self, monkeypatch):
+        """Create test client with OAuth and Firestore configuration."""
+        monkeypatch.setenv("APP_ENV", "dev")
+        monkeypatch.setenv("GITHUB_CLIENT_ID", "Iv1.test123")
+        monkeypatch.setenv("GITHUB_CLIENT_SECRET", "test_secret")
+        monkeypatch.setenv("GITHUB_APP_ID", "12345")
+        monkeypatch.setenv("GITHUB_OAUTH_REDIRECT_URI", "http://localhost:8000/oauth/callback")
+        monkeypatch.setenv("GCP_PROJECT_ID", "test-project")
+        monkeypatch.setenv("GITHUB_TOKEN_ENCRYPTION_KEY", secrets.token_hex(32))
+        
+        from app import config
+        original_settings = config.Settings
+        monkeypatch.setattr(
+            config,
+            "Settings",
+            lambda **kwargs: original_settings(_env_file=None, **kwargs)
+        )
+        
+        # Clear state tokens before each test
+        GitHubOAuthManager._state_tokens.clear()
+        
+        app = create_app()
+        return TestClient(app)
+    
+    @pytest.mark.asyncio
+    async def test_oauth_callback_persists_token_to_firestore(self, client, monkeypatch):
+        """Test that successful OAuth callback persists token to Firestore."""
+        import secrets
+        
+        # Setup
+        state = GitHubOAuthManager.generate_state_token()
+        
+        # Mock Firestore DAO
+        mock_dao = Mock()
+        mock_dao.save_github_token = AsyncMock()
+        
+        # Mock token exchange
+        with patch.object(
+            GitHubOAuthManager,
+            'exchange_code_for_token',
+            new_callable=AsyncMock
+        ) as mock_exchange, \
+             patch('app.dependencies.firestore.get_firestore_client') as mock_get_client, \
+             patch('app.dependencies.firestore.FirestoreDAO') as mock_dao_class:
+            
+            mock_exchange.return_value = {
+                "access_token": "gho_test_token_1234567890",
+                "token_type": "bearer",
+                "scope": "user:email,read:org",
+                "expires_in": 28800  # 8 hours
+            }
+            
+            # Setup mock DAO
+            mock_client = Mock()
+            mock_get_client.return_value = mock_client
+            mock_dao_class.return_value = mock_dao
+            
+            response = client.get(
+                f"/oauth/callback?code=test_code&state={state}",
+                cookies={"oauth_state": state}
+            )
+        
+        # Verify response
+        assert response.status_code == 200
+        assert b"Authorization Successful" in response.content
+        
+        # Verify DAO was called to save token
+        mock_dao.save_github_token.assert_called_once()
+        call_kwargs = mock_dao.save_github_token.call_args[1]
+        
+        assert call_kwargs["collection"] == "github_tokens"
+        assert call_kwargs["doc_id"] == "primary_user"
+        assert call_kwargs["access_token"] == "gho_test_token_1234567890"
+        assert call_kwargs["token_type"] == "bearer"
+        assert call_kwargs["scope"] == "user:email,read:org"
+        assert call_kwargs["expires_at"] is not None
+        assert call_kwargs["refresh_token"] is None
+    
+    @pytest.mark.asyncio
+    async def test_oauth_callback_calculates_expires_at_from_expires_in(self, client, monkeypatch):
+        """Test that expires_at is calculated from expires_in."""
+        from datetime import datetime, timezone, timedelta
+        
+        state = GitHubOAuthManager.generate_state_token()
+        mock_dao = Mock()
+        mock_dao.save_github_token = AsyncMock()
+        
+        with patch.object(
+            GitHubOAuthManager,
+            'exchange_code_for_token',
+            new_callable=AsyncMock
+        ) as mock_exchange, \
+             patch('app.dependencies.firestore.get_firestore_client') as mock_get_client, \
+             patch('app.dependencies.firestore.FirestoreDAO') as mock_dao_class:
+            
+            mock_exchange.return_value = {
+                "access_token": "gho_test_token",
+                "token_type": "bearer",
+                "scope": "repo",
+                "expires_in": 3600  # 1 hour
+            }
+            
+            mock_client = Mock()
+            mock_get_client.return_value = mock_client
+            mock_dao_class.return_value = mock_dao
+            
+            before_call = datetime.now(timezone.utc)
+            response = client.get(
+                f"/oauth/callback?code=test_code&state={state}",
+                cookies={"oauth_state": state}
+            )
+            after_call = datetime.now(timezone.utc)
+        
+        assert response.status_code == 200
+        
+        # Verify expires_at was calculated correctly
+        call_kwargs = mock_dao.save_github_token.call_args[1]
+        expires_at = call_kwargs["expires_at"]
+        
+        assert expires_at is not None
+        # expires_at should be approximately 1 hour from now (allowing for small time differences)
+        expected_min = before_call + timedelta(seconds=3600)
+        expected_max = after_call + timedelta(seconds=3600)
+        assert expected_min <= expires_at <= expected_max
+    
+    @pytest.mark.asyncio
+    async def test_oauth_callback_handles_missing_expires_in(self, client, monkeypatch):
+        """Test that missing expires_in is handled gracefully."""
+        state = GitHubOAuthManager.generate_state_token()
+        mock_dao = Mock()
+        mock_dao.save_github_token = AsyncMock()
+        
+        with patch.object(
+            GitHubOAuthManager,
+            'exchange_code_for_token',
+            new_callable=AsyncMock
+        ) as mock_exchange, \
+             patch('app.dependencies.firestore.get_firestore_client') as mock_get_client, \
+             patch('app.dependencies.firestore.FirestoreDAO') as mock_dao_class:
+            
+            # Token response without expires_in
+            mock_exchange.return_value = {
+                "access_token": "gho_test_token",
+                "token_type": "bearer",
+                "scope": "user"
+            }
+            
+            mock_client = Mock()
+            mock_get_client.return_value = mock_client
+            mock_dao_class.return_value = mock_dao
+            
+            response = client.get(
+                f"/oauth/callback?code=test_code&state={state}",
+                cookies={"oauth_state": state}
+            )
+        
+        assert response.status_code == 200
+        
+        # Verify expires_at is None when expires_in is not provided
+        call_kwargs = mock_dao.save_github_token.call_args[1]
+        assert call_kwargs["expires_at"] is None
+    
+    @pytest.mark.asyncio
+    async def test_oauth_callback_handles_missing_scope(self, client, monkeypatch):
+        """Test that missing scope is handled gracefully."""
+        state = GitHubOAuthManager.generate_state_token()
+        mock_dao = Mock()
+        mock_dao.save_github_token = AsyncMock()
+        
+        with patch.object(
+            GitHubOAuthManager,
+            'exchange_code_for_token',
+            new_callable=AsyncMock
+        ) as mock_exchange, \
+             patch('app.dependencies.firestore.get_firestore_client') as mock_get_client, \
+             patch('app.dependencies.firestore.FirestoreDAO') as mock_dao_class:
+            
+            # Token response without scope
+            mock_exchange.return_value = {
+                "access_token": "gho_test_token",
+                "token_type": "bearer"
+            }
+            
+            mock_client = Mock()
+            mock_get_client.return_value = mock_client
+            mock_dao_class.return_value = mock_dao
+            
+            response = client.get(
+                f"/oauth/callback?code=test_code&state={state}",
+                cookies={"oauth_state": state}
+            )
+        
+        assert response.status_code == 200
+        
+        # Verify scope is None when not provided
+        call_kwargs = mock_dao.save_github_token.call_args[1]
+        assert call_kwargs["scope"] is None
+    
+    @pytest.mark.asyncio
+    async def test_oauth_callback_includes_refresh_token_if_present(self, client, monkeypatch):
+        """Test that refresh_token is saved if provided."""
+        state = GitHubOAuthManager.generate_state_token()
+        mock_dao = Mock()
+        mock_dao.save_github_token = AsyncMock()
+        
+        with patch.object(
+            GitHubOAuthManager,
+            'exchange_code_for_token',
+            new_callable=AsyncMock
+        ) as mock_exchange, \
+             patch('app.dependencies.firestore.get_firestore_client') as mock_get_client, \
+             patch('app.dependencies.firestore.FirestoreDAO') as mock_dao_class:
+            
+            mock_exchange.return_value = {
+                "access_token": "gho_test_token",
+                "token_type": "bearer",
+                "scope": "repo",
+                "expires_in": 28800,
+                "refresh_token": "ghr_refresh_token_xyz"
+            }
+            
+            mock_client = Mock()
+            mock_get_client.return_value = mock_client
+            mock_dao_class.return_value = mock_dao
+            
+            response = client.get(
+                f"/oauth/callback?code=test_code&state={state}",
+                cookies={"oauth_state": state}
+            )
+        
+        assert response.status_code == 200
+        
+        # Verify refresh_token was saved
+        call_kwargs = mock_dao.save_github_token.call_args[1]
+        assert call_kwargs["refresh_token"] == "ghr_refresh_token_xyz"
+    
+    @pytest.mark.asyncio
+    async def test_oauth_callback_firestore_failure_returns_503(self, client, monkeypatch):
+        """Test that Firestore write failure returns 503 error."""
+        state = GitHubOAuthManager.generate_state_token()
+        mock_dao = Mock()
+        # Simulate Firestore failure
+        mock_dao.save_github_token = AsyncMock(side_effect=Exception("Firestore unavailable"))
+        
+        with patch.object(
+            GitHubOAuthManager,
+            'exchange_code_for_token',
+            new_callable=AsyncMock
+        ) as mock_exchange, \
+             patch('app.dependencies.firestore.get_firestore_client') as mock_get_client, \
+             patch('app.dependencies.firestore.FirestoreDAO') as mock_dao_class:
+            
+            mock_exchange.return_value = {
+                "access_token": "gho_test_token",
+                "token_type": "bearer",
+                "scope": "user"
+            }
+            
+            mock_client = Mock()
+            mock_get_client.return_value = mock_client
+            mock_dao_class.return_value = mock_dao
+            
+            response = client.get(
+                f"/oauth/callback?code=test_code&state={state}",
+                cookies={"oauth_state": state}
+            )
+        
+        # Verify 503 error is returned
+        assert response.status_code == 503
+        assert b"Token Storage Failed" in response.content
+        assert b"could not be saved" in response.content
+    
+    @pytest.mark.asyncio
+    async def test_oauth_callback_does_not_redirect_success_on_firestore_failure(self, client, monkeypatch):
+        """Test that callback does not claim success when Firestore fails."""
+        state = GitHubOAuthManager.generate_state_token()
+        mock_dao = Mock()
+        mock_dao.save_github_token = AsyncMock(side_effect=Exception("Firestore error"))
+        
+        with patch.object(
+            GitHubOAuthManager,
+            'exchange_code_for_token',
+            new_callable=AsyncMock
+        ) as mock_exchange, \
+             patch('app.dependencies.firestore.get_firestore_client') as mock_get_client, \
+             patch('app.dependencies.firestore.FirestoreDAO') as mock_dao_class:
+            
+            mock_exchange.return_value = {
+                "access_token": "gho_test_token",
+                "token_type": "bearer"
+            }
+            
+            mock_client = Mock()
+            mock_get_client.return_value = mock_client
+            mock_dao_class.return_value = mock_dao
+            
+            response = client.get(
+                f"/oauth/callback?code=test_code&state={state}",
+                cookies={"oauth_state": state}
+            )
+        
+        # Should NOT show success message
+        assert b"Authorization Successful" not in response.content
+        # Should show error instead
+        assert response.status_code == 503
+        assert b"Token Storage Failed" in response.content
+    
+    @pytest.mark.asyncio
+    async def test_oauth_callback_repeated_calls_overwrite_token(self, client, monkeypatch):
+        """Test that repeated callbacks overwrite the token deterministically."""
+        mock_dao = Mock()
+        mock_dao.save_github_token = AsyncMock()
+        
+        with patch.object(
+            GitHubOAuthManager,
+            'exchange_code_for_token',
+            new_callable=AsyncMock
+        ) as mock_exchange, \
+             patch('app.dependencies.firestore.get_firestore_client') as mock_get_client, \
+             patch('app.dependencies.firestore.FirestoreDAO') as mock_dao_class:
+            
+            mock_exchange.return_value = {
+                "access_token": "gho_test_token_1",
+                "token_type": "bearer"
+            }
+            
+            mock_client = Mock()
+            mock_get_client.return_value = mock_client
+            mock_dao_class.return_value = mock_dao
+            
+            # First callback
+            state1 = GitHubOAuthManager.generate_state_token()
+            response1 = client.get(
+                f"/oauth/callback?code=code1&state={state1}",
+                cookies={"oauth_state": state1}
+            )
+            
+            # Update token for second call
+            mock_exchange.return_value["access_token"] = "gho_test_token_2"
+            
+            # Second callback
+            state2 = GitHubOAuthManager.generate_state_token()
+            response2 = client.get(
+                f"/oauth/callback?code=code2&state={state2}",
+                cookies={"oauth_state": state2}
+            )
+        
+        # Both should succeed
+        assert response1.status_code == 200
+        assert response2.status_code == 200
+        
+        # Verify both writes occurred
+        assert mock_dao.save_github_token.call_count == 2
+        
+        # Verify tokens are different
+        call1_token = mock_dao.save_github_token.call_args_list[0][1]["access_token"]
+        call2_token = mock_dao.save_github_token.call_args_list[1][1]["access_token"]
+        assert call1_token == "gho_test_token_1"
+        assert call2_token == "gho_test_token_2"
+    
+    @pytest.mark.asyncio
+    async def test_token_masking_in_logs(self, client, monkeypatch, caplog):
+        """Test that sensitive token data is masked in logs."""
+        import logging
+        caplog.set_level(logging.INFO)
+        
+        state = GitHubOAuthManager.generate_state_token()
+        mock_dao = Mock()
+        mock_dao.save_github_token = AsyncMock()
+        
+        with patch.object(
+            GitHubOAuthManager,
+            'exchange_code_for_token',
+            new_callable=AsyncMock
+        ) as mock_exchange, \
+             patch('app.dependencies.firestore.get_firestore_client') as mock_get_client, \
+             patch('app.dependencies.firestore.FirestoreDAO') as mock_dao_class:
+            
+            # Use a recognizable token
+            full_token = "gho_test_token_should_be_masked_1234567890"
+            mock_exchange.return_value = {
+                "access_token": full_token,
+                "token_type": "bearer",
+                "scope": "repo"
+            }
+            
+            mock_client = Mock()
+            mock_get_client.return_value = mock_client
+            mock_dao_class.return_value = mock_dao
+            
+            response = client.get(
+                f"/oauth/callback?code=test_code&state={state}",
+                cookies={"oauth_state": state}
+            )
+        
+        assert response.status_code == 200
+        
+        # Verify full token is NOT in logs
+        # The service layer (GitHubOAuthManager.exchange_code_for_token) masks tokens,
+        # showing only prefix (first 8 chars) + "..." + suffix (last 4 chars)
+        log_text = caplog.text
+        
+        # The full middle part should not be in logs
+        assert "should_be_masked" not in log_text, "Token middle portion should be masked in logs"
+        
+        # The masked version (prefix...suffix) may be present
+        # e.g., "gho_test..." or similar pattern
+        if full_token in log_text:
+            # If full token appears, fail the test
+            pytest.fail(f"Full token '{full_token}' should not appear in logs unmasked")
