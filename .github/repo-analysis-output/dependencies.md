@@ -11,7 +11,7 @@ Includes classification of external dependencies as stdlib vs third-party.
 - **Total files**: 29
 - **Intra-repo dependencies**: 49
 - **External stdlib dependencies**: 29
-- **External third-party dependencies**: 34
+- **External third-party dependencies**: 35
 
 ## External Dependencies
 
@@ -43,7 +43,7 @@ Total: 29 unique modules
 
 ### Third-Party Packages
 
-Total: 34 unique packages
+Total: 35 unique packages
 
 - `cryptography.exceptions.InvalidTag`
 - `cryptography.hazmat.backends.default_backend`
@@ -61,11 +61,11 @@ Total: 34 unique packages
 - `fastapi.Request`
 - `fastapi.Response`
 - `fastapi.middleware.cors.CORSMiddleware`
+- `fastapi.openapi.utils.get_openapi`
 - `fastapi.responses.HTMLResponse`
 - `fastapi.responses.RedirectResponse`
 - `fastapi.status`
-- `fastapi.testclient.TestClient`
-- ... and 14 more (see JSON for full list)
+- ... and 15 more (see JSON for full list)
 
 ## Most Depended Upon Files (Intra-Repo)
 

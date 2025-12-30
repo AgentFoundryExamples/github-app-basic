@@ -65,8 +65,8 @@ Total files: 29
 **Role:** entry-point  
 **Role Justification:** common entry point name 'main'  
 **Summary:** Python main entry point (role: entry-point)  
-**Size:** 5.31 KB  
-**LOC:** 107  
+**Size:** 8.29 KB  
+**LOC:** 162  
 **TODOs/FIXMEs:** 1  
 
 ## app/routes/__init__.py
@@ -110,8 +110,8 @@ Total files: 29
 **Role:** implementation  
 **Role Justification:** general implementation file (default classification)  
 **Summary:** Python module for token  
-**Size:** 16.53 KB  
-**LOC:** 356  
+**Size:** 17.31 KB  
+**LOC:** 371  
 **TODOs/FIXMEs:** 0  
 
 ## app/services/__init__.py

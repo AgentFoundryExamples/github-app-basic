@@ -101,6 +101,7 @@
           "fastapi.FastAPI",
           "fastapi.Request",
           "fastapi.middleware.cors.CORSMiddleware",
+          "fastapi.openapi.utils.get_openapi",
           "uvicorn"
         ]
       }
@@ -747,6 +748,7 @@
       "fastapi.Request",
       "fastapi.Response",
       "fastapi.middleware.cors.CORSMiddleware",
+      "fastapi.openapi.utils.get_openapi",
       "fastapi.responses.HTMLResponse",
       "fastapi.responses.RedirectResponse",
       "fastapi.status",
@@ -767,6 +769,6 @@
       "uvicorn"
     ],
     "stdlib_count": 29,
-    "third-party_count": 34
+    "third-party_count": 35
   }
 }
