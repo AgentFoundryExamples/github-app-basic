@@ -14,6 +14,7 @@
 """Tests for GitHub token refresh workflows."""
 
 import pytest
+import httpx
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime, timezone, timedelta
 
@@ -530,8 +531,6 @@ class TestTokenRefreshRetryLogic:
     @pytest.mark.asyncio
     async def test_refresh_retries_on_network_error(self, github_app_jwt, token_data):
         """Test that network errors trigger retry."""
-        import httpx
-        
         # First attempt fails with network error, second succeeds
         mock_response_success = Mock()
         mock_response_success.status_code = 200

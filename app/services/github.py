@@ -21,8 +21,9 @@ Provides functionality for:
 
 import time
 import secrets
+import asyncio
 from typing import Dict, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import jwt
 import httpx
@@ -432,8 +433,6 @@ class GitHubTokenRefreshManager:
             GitHubTokenRefreshCooldownError: If cooldown period has not elapsed
             GitHubTokenRefreshError: If refresh fails after all retries
         """
-        from datetime import datetime, timezone
-        
         now = datetime.now(timezone.utc)
         
         # Check cooldown unless force_refresh is True
@@ -619,7 +618,6 @@ class GitHubTokenRefreshManager:
                             raise GitHubTokenRefreshError(error_msg)
                         
                         # Otherwise, retry with exponential backoff
-                        import asyncio
                         backoff = min(2 ** attempt, 8)  # Cap at 8 seconds
                         logger.info(
                             f"Retrying refresh after {backoff}s backoff",
@@ -666,7 +664,6 @@ class GitHubTokenRefreshManager:
                 
                 # Retry on network errors
                 if attempt < max_retries - 1:
-                    import asyncio
                     backoff = min(2 ** attempt, 8)
                     await asyncio.sleep(backoff)
                     continue
