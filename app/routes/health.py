@@ -23,7 +23,13 @@ from app.dependencies.firestore import get_settings
 from app.services.firestore import get_firestore_client
 from app.services.readiness import get_readiness_state
 from app.utils.logging import get_logger, log_structured_event
-from app.utils.metrics import increment_counter
+from app.utils.metrics import (
+    increment_counter,
+    METRIC_HEALTH_CHECK_SUCCESSES,
+    METRIC_HEALTH_CHECK_FAILURES,
+    METRIC_READINESS_CHECK_SUCCESSES,
+    METRIC_READINESS_CHECK_FAILURES
+)
 from app.utils.security import sanitize_exception_message
 
 logger = get_logger(__name__)
@@ -31,8 +37,10 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 # Cache for health check results to avoid hammering Firestore
+# Protected by Python GIL for simple dictionary operations
 _health_cache: Dict[str, Any] = {}
 _health_cache_timestamp: Optional[datetime] = None
+_health_cache_lock = asyncio.Lock()
 
 
 async def check_firestore_health(settings: Settings) -> Dict[str, Any]:
@@ -175,53 +183,54 @@ async def health_check(
         "Health check endpoint called"
     )
     
-    # Check if cache is valid
-    cache_valid = False
-    if _health_cache_timestamp and settings.health_check_cache_ttl_seconds > 0:
-        cache_age = (datetime.now(timezone.utc) - _health_cache_timestamp).total_seconds()
-        cache_valid = cache_age < settings.health_check_cache_ttl_seconds
-    
-    if cache_valid and _health_cache:
-        log_structured_event(
-            logger,
-            "debug",
-            "health_check_cache_hit",
-            "Using cached health check results"
-        )
-        result = _health_cache
-    else:
-        # Perform health checks
-        firestore_health = await check_firestore_health(settings)
-        github_config_health = check_github_config(settings)
+    # Check if cache is valid (thread-safe with async lock)
+    async with _health_cache_lock:
+        cache_valid = False
+        if _health_cache_timestamp and settings.health_check_cache_ttl_seconds > 0:
+            cache_age = (datetime.now(timezone.utc) - _health_cache_timestamp).total_seconds()
+            cache_valid = cache_age < settings.health_check_cache_ttl_seconds
         
-        # Determine overall status
-        all_healthy = all([
-            firestore_health["status"] == "healthy",
-            github_config_health["status"] == "healthy"
-        ])
-        
-        result = {
-            "status": "healthy" if all_healthy else "unhealthy",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "checks": {
-                "firestore": firestore_health,
-                "github_config": github_config_health
+        if cache_valid and _health_cache:
+            log_structured_event(
+                logger,
+                "debug",
+                "health_check_cache_hit",
+                "Using cached health check results"
+            )
+            result = _health_cache
+        else:
+            # Perform health checks
+            firestore_health = await check_firestore_health(settings)
+            github_config_health = check_github_config(settings)
+            
+            # Determine overall status
+            all_healthy = all([
+                firestore_health["status"] == "healthy",
+                github_config_health["status"] == "healthy"
+            ])
+            
+            result = {
+                "status": "healthy" if all_healthy else "unhealthy",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "checks": {
+                    "firestore": firestore_health,
+                    "github_config": github_config_health
+                }
             }
-        }
-        
-        # Update cache
-        _health_cache = result
-        _health_cache_timestamp = datetime.now(timezone.utc)
-        
-        log_structured_event(
-            logger,
-            "info",
-            "health_check_completed",
-            f"Health check completed: {result['status']}",
-            status=result['status'],
-            firestore_status=firestore_health["status"],
-            github_config_status=github_config_health["status"]
-        )
+            
+            # Update cache
+            _health_cache = result
+            _health_cache_timestamp = datetime.now(timezone.utc)
+            
+            log_structured_event(
+                logger,
+                "info",
+                "health_check_completed",
+                f"Health check completed: {result['status']}",
+                status=result['status'],
+                firestore_status=firestore_health["status"],
+                github_config_status=github_config_health["status"]
+            )
     
     # Update readiness state based on health check
     readiness_state = get_readiness_state()
@@ -238,9 +247,9 @@ async def health_check(
     # Set HTTP status code
     if result["status"] != "healthy":
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        increment_counter("health_check_failures_total")
+        increment_counter(METRIC_HEALTH_CHECK_FAILURES)
     else:
-        increment_counter("health_check_successes_total")
+        increment_counter(METRIC_HEALTH_CHECK_SUCCESSES)
     
     return result
 
@@ -271,9 +280,9 @@ async def readiness_check(response: Response) -> Dict[str, Any]:
     
     if not status_info["ready"]:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        increment_counter("readiness_check_failures_total")
+        increment_counter(METRIC_READINESS_CHECK_FAILURES)
     else:
-        increment_counter("readiness_check_successes_total")
+        increment_counter(METRIC_READINESS_CHECK_SUCCESSES)
     
     return {
         "ready": status_info["ready"],
