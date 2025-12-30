@@ -24,6 +24,7 @@ from app.config import Settings
 from app.dao.firestore_dao import FirestoreDAO
 from app.dependencies.firestore import get_firestore_dao, get_settings
 from app.utils.logging import get_logger
+from app.utils.security import sanitize_exception_message
 
 logger = get_logger(__name__)
 
@@ -175,7 +176,7 @@ async def get_token_metadata(
     except PermissionError as e:
         logger.error(
             "Permission denied accessing Firestore",
-            extra={"extra_fields": {"error": str(e)}},
+            extra={"extra_fields": {"error": sanitize_exception_message(e)}},
             exc_info=True
         )
         raise HTTPException(
@@ -187,7 +188,7 @@ async def get_token_metadata(
         logger.error(
             "Failed to retrieve token metadata",
             extra={"extra_fields": {
-                "error": str(e),
+                "error": sanitize_exception_message(e),
                 "error_type": type(e).__name__
             }},
             exc_info=True

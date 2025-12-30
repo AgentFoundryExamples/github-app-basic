@@ -30,6 +30,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from app.config import Settings
 from app.services.github import GitHubOAuthManager, GitHubOAuthError
 from app.utils.logging import get_logger, correlation_id_var
+from app.utils.security import redact_token, sanitize_exception_message
 from app.dao.firestore_dao import FirestoreDAO
 from app.dependencies.firestore import get_firestore_dao
 
@@ -438,7 +439,7 @@ async def oauth_callback(
                 "OAuth token exchange failed",
                 extra={"extra_fields": {
                     "correlation_id": correlation_id,
-                    "error": str(e)
+                    "error": sanitize_exception_message(e)
                 }}
             )
             
@@ -446,7 +447,7 @@ async def oauth_callback(
                 content=_render_error_page(
                     title="Token Exchange Failed",
                     message="Failed to exchange authorization code for access token",
-                    details=str(e)
+                    details=f"Please try again or contact support if the issue persists. (Correlation ID: {correlation_id})"
                 ),
                 status_code=500
             )
@@ -524,7 +525,7 @@ async def oauth_callback(
                 "Permission denied writing to Firestore",
                 extra={"extra_fields": {
                     "correlation_id": correlation_id,
-                    "error": str(e)
+                    "error": sanitize_exception_message(e)
                 }},
                 exc_info=True
             )
@@ -544,7 +545,7 @@ async def oauth_callback(
                 "Invalid data for token persistence",
                 extra={"extra_fields": {
                     "correlation_id": correlation_id,
-                    "error": str(e)
+                    "error": sanitize_exception_message(e)
                 }},
                 exc_info=True
             )
@@ -564,7 +565,7 @@ async def oauth_callback(
                 "Failed to persist GitHub token to Firestore",
                 extra={"extra_fields": {
                     "correlation_id": correlation_id,
-                    "error": str(e),
+                    "error": sanitize_exception_message(e),
                     "error_type": type(e).__name__
                 }},
                 exc_info=True

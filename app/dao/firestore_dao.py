@@ -29,7 +29,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidTag
 import secrets
 
-from app.utils.logging import get_logger, mask_sensitive_data
+from app.utils.logging import get_logger
+from app.utils.security import redact_token, sanitize_exception_message
 
 logger = get_logger(__name__)
 
@@ -292,7 +293,7 @@ class FirestoreDAO:
             
             return data.decode('utf-8')
         except (ValueError, InvalidTag, TypeError) as e:
-            error_msg = f"Failed to decrypt token: {str(e)}"
+            error_msg = f"Failed to decrypt token: {sanitize_exception_message(e)}"
             logger.error(error_msg)
             raise ValueError(error_msg) from e
     
@@ -379,7 +380,7 @@ class FirestoreDAO:
                 "scope": scope,
                 "has_refresh_token": refresh_token is not None,
                 "last_refresh_status": last_refresh_status,
-                "access_token_preview": mask_sensitive_data(access_token, 4)
+                "access_token_preview": redact_token(access_token, prefix_len=4, suffix_len=0)
             }}
         )
         

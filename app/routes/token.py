@@ -33,6 +33,7 @@ from app.services.github import (
     GitHubTokenRefreshCooldownError
 )
 from app.utils.logging import get_logger
+from app.utils.security import sanitize_exception_message
 
 logger = get_logger(__name__)
 
@@ -339,23 +340,24 @@ async def get_token(
                     "Token refresh blocked by cooldown, returning current token",
                     extra={"extra_fields": {
                         "seconds_until_retry": e.seconds_until_retry,
-                        "error_message": str(e)
+                        "error_message": sanitize_exception_message(e)
                     }}
                 )
                 # Fall through to return current token
                 
             except GitHubTokenRefreshError as e:
                 # Token refresh failed - log error and persist failure
+                sanitized_error = sanitize_exception_message(e)
                 logger.error(
                     "GitHub token refresh failed",
                     extra={"extra_fields": {
-                        "error": str(e),
+                        "error": sanitized_error,
                         "error_type": type(e).__name__
                     }},
                     exc_info=True
                 )
                 
-                # Persist failure metadata
+                # Persist failure metadata (use sanitized error)
                 try:
                     await dao.save_github_token(
                         collection=settings.github_tokens_collection,
@@ -367,12 +369,12 @@ async def get_token(
                         refresh_token=token_data.get("refresh_token"),
                         last_refresh_attempt=datetime.now(timezone.utc),
                         last_refresh_status="failed",
-                        last_refresh_error=str(e)
+                        last_refresh_error=sanitized_error
                     )
                 except Exception as persist_error:
                     logger.error(
                         "Failed to persist refresh failure metadata",
-                        extra={"extra_fields": {"error": str(persist_error)}}
+                        extra={"extra_fields": {"error": sanitize_exception_message(persist_error)}}
                     )
                 
                 # Return 500 with sanitized error
@@ -386,7 +388,7 @@ async def get_token(
                 logger.error(
                     "Unexpected error during token refresh",
                     extra={"extra_fields": {
-                        "error": str(e),
+                        "error": sanitize_exception_message(e),
                         "error_type": type(e).__name__
                     }},
                     exc_info=True
@@ -412,7 +414,7 @@ async def get_token(
         logger.error(
             "Permission denied accessing Firestore",
             extra={"extra_fields": {
-                "error": str(e),
+                "error": sanitize_exception_message(e),
                 "error_type": type(e).__name__
             }},
             exc_info=True
@@ -425,14 +427,15 @@ async def get_token(
     except Exception as e:
         # Check if it's a Firestore connectivity/API error
         error_type = type(e).__name__
-        error_str = str(e).lower()
+        sanitized_error = sanitize_exception_message(e)
+        error_str = sanitized_error.lower()
         
         # Firestore-related errors should return 503
         if any(keyword in error_str for keyword in ["firestore", "connection", "unavailable", "timeout"]):
             logger.error(
                 "Firestore service error",
                 extra={"extra_fields": {
-                    "error": str(e),
+                    "error": sanitized_error,
                     "error_type": error_type
                 }},
                 exc_info=True
@@ -446,7 +449,7 @@ async def get_token(
         logger.error(
             "Failed to retrieve token",
             extra={"extra_fields": {
-                "error": str(e),
+                "error": sanitized_error,
                 "error_type": error_type
             }},
             exc_info=True

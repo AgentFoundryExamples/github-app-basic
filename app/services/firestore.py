@@ -24,6 +24,7 @@ from google.api_core import exceptions as gcp_exceptions
 
 from app.config import Settings
 from app.utils.logging import get_logger
+from app.utils.security import sanitize_exception_message
 
 logger = get_logger(__name__)
 
@@ -89,11 +90,11 @@ def get_firestore_client(settings: Settings) -> firestore.AsyncClient:
             return _firestore_client
             
         except gcp_exceptions.GoogleAPICallError as e:
-            error_msg = f"Failed to initialize Firestore client: {str(e)}"
+            error_msg = f"Failed to initialize Firestore client: {sanitize_exception_message(e)}"
             logger.error(error_msg, exc_info=True)
             raise Exception(error_msg) from e
         except Exception as e:
-            error_msg = f"Unexpected error initializing Firestore client: {str(e)}"
+            error_msg = f"Unexpected error initializing Firestore client: {sanitize_exception_message(e)}"
             logger.error(error_msg, exc_info=True)
             raise
 
