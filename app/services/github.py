@@ -442,10 +442,15 @@ class GitHubTokenRefreshManager:
             
             if last_attempt_str and last_status == "failed":
                 # Parse ISO datetime string to timezone-aware datetime
+                # Note: We inline this logic here to avoid circular import with FirestoreDAO
+                # This duplicates FirestoreDAO.parse_iso_datetime but is necessary
                 last_attempt = None
                 try:
-                    # Handle 'Z' suffix for UTC (fromisoformat doesn't handle it in Python < 3.11)
-                    datetime_str = last_attempt_str.replace('Z', '+00:00')
+                    # Handle 'Z' suffix for UTC (Python's fromisoformat supports it in 3.11+)
+                    # For compatibility with older versions, replace 'Z' with '+00:00'
+                    datetime_str = last_attempt_str
+                    if datetime_str.endswith('Z'):
+                        datetime_str = datetime_str[:-1] + '+00:00'
                     last_attempt = datetime.fromisoformat(datetime_str)
                     # Ensure timezone-aware - if naive, assume UTC
                     if last_attempt.tzinfo is None:
