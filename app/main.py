@@ -95,7 +95,7 @@ Service for minting GitHub App tokens with GCP integration.
 
 **Obtaining Identity Tokens:**
 - **User accounts:** `gcloud auth print-identity-token`
-- **Service accounts (Python):** Use `google.auth.default()` and `credentials.id_token`
+- **Service accounts (Python):** Use `google.oauth2.id_token.fetch_id_token(auth_req, service_url)`
 - **Service accounts (Node.js):** Use `GoogleAuth.getIdTokenClient(serviceUrl)`
 - **Cloud Scheduler:** Configure OIDC authentication with service account
 
@@ -104,9 +104,10 @@ Service for minting GitHub App tokens with GCP integration.
 - Use regional URLs (e.g., `https://service-xxxxx-uc.a.run.app`)
 - Do not use custom domains
 
-**Security Conceptual Model:**
-While the OpenAPI specification below describes a conceptual "bearerAuth" security scheme,
-the actual authentication is enforced by Cloud Run's IAM layer, not by this application.
+**Security Model:**
+The OpenAPI specification below defines a "CloudRunIAM" security scheme to document
+the authentication requirements for client generators. However, the actual authentication
+is enforced by Cloud Run's IAM layer at the infrastructure level, not by this application.
 The bearer token referenced is a GCP identity token, not the GitHub access token.
         """,
         version="0.1.0",
@@ -114,6 +115,48 @@ The bearer token referenced is a GCP identity token, not the GitHub access token
         docs_url="/docs",
         openapi_url="/openapi.json",
     )
+    
+    # Add security scheme to OpenAPI spec
+    def custom_openapi():
+        if app.openapi_schema:
+            return app.openapi_schema
+        
+        from fastapi.openapi.utils import get_openapi
+        openapi_schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+        )
+        
+        # Define the Cloud Run IAM security scheme
+        openapi_schema["components"]["securitySchemes"] = {
+            "CloudRunIAM": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "GCP Identity Token",
+                "description": (
+                    "Cloud Run IAM authentication using GCP identity tokens. "
+                    "Obtain an identity token via `gcloud auth print-identity-token` (for users) "
+                    "or `google.oauth2.id_token.fetch_id_token()` (for service accounts). "
+                    "The token audience must match the Cloud Run service URL. "
+                    "Callers must have the `roles/run.invoker` IAM role."
+                )
+            }
+        }
+        
+        # Apply security scheme to all endpoints except health check
+        for path, path_item in openapi_schema.get("paths", {}).items():
+            if path == "/healthz":
+                continue  # Health check is publicly accessible
+            for operation in path_item.values():
+                if isinstance(operation, dict) and "operationId" in operation:
+                    operation["security"] = [{"CloudRunIAM": []}]
+        
+        app.openapi_schema = openapi_schema
+        return app.openapi_schema
+    
+    app.openapi = custom_openapi
     
     # Store settings in app state
     app.state.settings = settings

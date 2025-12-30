@@ -1430,21 +1430,24 @@ def get_github_token(force_refresh: bool = False) -> dict:
         requests.HTTPError: If request fails (404, 500, 503)
     """
     # Obtain identity token for service-to-service auth
-    # For service accounts in Cloud Run/Cloud Functions, we need to explicitly
-    # request an identity token with the target service URL as the audience
+    # This works for both service accounts on GCP and user credentials
+    # via Application Default Credentials (ADC).
     import google.auth.transport.requests
     import google.oauth2.id_token
     
     try:
-        # For service accounts: fetch identity token with target audience
         auth_req = google.auth.transport.requests.Request()
+        
+        # fetch_id_token will use the credentials from google.auth.default()
+        # to generate an identity token with the target service URL as audience.
         id_token = google.oauth2.id_token.fetch_id_token(auth_req, SERVICE_URL)
-    except Exception:
-        # Fallback for user accounts or local development
-        # This uses Application Default Credentials (ADC)
-        credentials, project = google.auth.default()
-        credentials.refresh(auth_req)
-        id_token = credentials.id_token
+        
+    except google.auth.exceptions.DefaultCredentialsError as e:
+        raise Exception(
+            "Could not find default credentials. "
+            "Please run 'gcloud auth application-default login' or "
+            "set up service account credentials."
+        ) from e
     
     # Make authenticated request to token endpoint
     headers = {
@@ -1586,8 +1589,8 @@ Cloud Functions can call the token endpoint using the same approach as Cloud Run
 
 ```python
 import functions_framework
-import google.auth
 import google.auth.transport.requests
+import google.oauth2.id_token
 import requests
 
 SERVICE_URL = "https://github-app-token-service-xxxxx-uc.a.run.app"
@@ -1598,11 +1601,9 @@ def get_github_repos(request):
     Cloud Function that retrieves GitHub repositories for the authenticated user.
     """
     try:
-        # Get identity token
+        # Get identity token with the correct audience for the target service
         auth_req = google.auth.transport.requests.Request()
-        credentials, _ = google.auth.default()
-        credentials.refresh(auth_req)
-        id_token = credentials.id_token
+        id_token = google.oauth2.id_token.fetch_id_token(auth_req, SERVICE_URL)
         
         # Call token endpoint
         token_response = requests.post(
@@ -1832,8 +1833,6 @@ def get_github_token_with_retry(
                 continue
             else:
                 raise Exception(f"Request failed after max retries: {e}")
-    
-    raise Exception("Max retries exhausted")
 ```
 
 ### Understanding Token Expiration and force_refresh
