@@ -86,6 +86,16 @@ class Settings(BaseSettings):
         description="Minimum seconds to wait between token refresh attempts (cooldown period)"
     )
     
+    # Logging and Instrumentation Configuration
+    enable_request_logging: bool = Field(
+        default=False,
+        description="Enable request logging middleware (disabled by default for production)"
+    )
+    enable_metrics: bool = Field(
+        default=False,
+        description="Enable Prometheus metrics endpoint (disabled by default)"
+    )
+    
     @field_validator("app_env")
     @classmethod
     def validate_app_env(cls, v: str) -> str:

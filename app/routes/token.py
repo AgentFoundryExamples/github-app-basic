@@ -34,6 +34,13 @@ from app.services.github import (
 )
 from app.utils.logging import get_logger
 from app.utils.security import sanitize_exception_message
+from app.utils.metrics import (
+    increment_counter,
+    METRIC_TOKEN_REFRESH_ATTEMPTS,
+    METRIC_TOKEN_REFRESH_SUCCESSES,
+    METRIC_TOKEN_REFRESH_FAILURES,
+    METRIC_TOKEN_REFRESH_COOLDOWNS
+)
 
 logger = get_logger(__name__)
 
@@ -268,12 +275,16 @@ async def get_token(
         
         # Refresh token if needed
         if needs_refresh:
+            # Increment refresh attempts counter
+            increment_counter(METRIC_TOKEN_REFRESH_ATTEMPTS)
+            
             try:
                 # Initialize GitHub App JWT
                 if not settings.github_app_id or not settings.github_app_private_key_pem:
                     logger.error(
                         "GitHub App credentials not configured for token refresh",
                         extra={"extra_fields": {
+                            "event": "token_refresh_config_error",
                             "has_app_id": settings.github_app_id is not None,
                             "has_private_key": settings.github_app_private_key_pem is not None
                         }}
@@ -289,7 +300,10 @@ async def get_token(
                 )
                 
                 # Refresh the token
-                logger.info("Refreshing GitHub token")
+                logger.info(
+                    "Refreshing GitHub token",
+                    extra={"extra_fields": {"event": "token_refresh_attempt"}}
+                )
                 refreshed_token_data = await GitHubTokenRefreshManager.refresh_user_token(
                     current_token_data=token_data,
                     github_app_jwt=github_app_jwt,
@@ -319,9 +333,14 @@ async def get_token(
                     last_refresh_error=None
                 )
                 
+                # Increment success counter
+                increment_counter(METRIC_TOKEN_REFRESH_SUCCESSES)
+                
                 logger.info(
                     "Token refreshed successfully",
                     extra={"extra_fields": {
+                        "event": "token_refresh_success",
+                        "outcome": "success",
                         "refresh_method": refreshed_token_data.get("refresh_method"),
                         "has_new_expiry": new_expires_at is not None
                     }}
@@ -335,10 +354,15 @@ async def get_token(
                 )
                 
             except GitHubTokenRefreshCooldownError as e:
+                # Increment cooldown counter
+                increment_counter(METRIC_TOKEN_REFRESH_COOLDOWNS)
+                
                 # Cooldown error - return current token with logged warning
                 logger.warning(
                     "Token refresh blocked by cooldown, returning current token",
                     extra={"extra_fields": {
+                        "event": "token_refresh_cooldown",
+                        "outcome": "cooldown",
                         "seconds_until_retry": e.seconds_until_retry,
                         "error_message": sanitize_exception_message(e)
                     }}
@@ -346,11 +370,16 @@ async def get_token(
                 # Fall through to return current token
                 
             except GitHubTokenRefreshError as e:
+                # Increment failure counter
+                increment_counter(METRIC_TOKEN_REFRESH_FAILURES)
+                
                 # Token refresh failed - log error and persist failure
                 sanitized_error = sanitize_exception_message(e)
                 logger.error(
                     "GitHub token refresh failed",
                     extra={"extra_fields": {
+                        "event": "token_refresh_failure",
+                        "outcome": "failure",
                         "error": sanitized_error,
                         "error_type": type(e).__name__
                     }},
@@ -384,10 +413,15 @@ async def get_token(
                 )
             
             except Exception as e:
+                # Increment failure counter for unexpected errors
+                increment_counter(METRIC_TOKEN_REFRESH_FAILURES)
+                
                 # Unexpected error during refresh
                 logger.error(
                     "Unexpected error during token refresh",
                     extra={"extra_fields": {
+                        "event": "token_refresh_unexpected_error",
+                        "outcome": "failure",
                         "error": sanitize_exception_message(e),
                         "error_type": type(e).__name__
                     }},

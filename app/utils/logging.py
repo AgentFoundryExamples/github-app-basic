@@ -31,7 +31,12 @@ correlation_id_var: ContextVar[Optional[str]] = ContextVar('correlation_id', def
 
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
-    """Custom JSON formatter that adds standard fields to all log records."""
+    """Custom JSON formatter that adds standard fields to all log records.
+    
+    Emits JSON-formatted logs compatible with GCP Logging and other cloud platforms.
+    Standard fields include timestamp, level, logger, message, request_id, and correlation_id.
+    Additional structured fields can be provided via the 'extra_fields' attribute.
+    """
     
     def add_fields(
         self, 
@@ -64,7 +69,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         if correlation_id:
             log_record["correlation_id"] = correlation_id
         
-        # Add any extra fields
+        # Add any extra fields (structured event data)
         if hasattr(record, "extra_fields"):
             log_record.update(record.extra_fields)
 
@@ -136,3 +141,37 @@ def mask_sensitive_data(value: str, visible_chars: int = 4) -> str:
     # Import here to avoid circular dependency
     from app.utils.security import redact_token
     return redact_token(value, prefix_len=visible_chars, suffix_len=0, mask_char="*")
+
+
+def log_structured_event(
+    logger: logging.Logger,
+    level: str,
+    event: str,
+    message: str,
+    **kwargs
+) -> None:
+    """Log a structured event with consistent schema.
+    
+    Emits a structured log entry with standard fields for GCP Logging compatibility.
+    
+    Args:
+        logger: Logger instance to use
+        level: Log level (info, warning, error, etc.)
+        event: Event type identifier (e.g., "token_refresh_attempt", "oauth_callback")
+        message: Human-readable message
+        **kwargs: Additional structured fields (e.g., outcome, duration, installation_id)
+        
+    Example:
+        log_structured_event(
+            logger, "info", "token_refresh_success",
+            "Token refreshed successfully",
+            outcome="success",
+            duration_ms=150,
+            installation_id="12345"
+        )
+    """
+    extra_fields = {"event": event}
+    extra_fields.update(kwargs)
+    
+    log_func = getattr(logger, level.lower(), logger.info)
+    log_func(message, extra={"extra_fields": extra_fields})

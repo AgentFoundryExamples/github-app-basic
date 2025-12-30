@@ -31,6 +31,12 @@ from app.config import Settings
 from app.services.github import GitHubOAuthManager, GitHubOAuthError
 from app.utils.logging import get_logger, correlation_id_var
 from app.utils.security import redact_token, sanitize_exception_message
+from app.utils.metrics import (
+    increment_counter,
+    METRIC_OAUTH_FLOWS_STARTED,
+    METRIC_OAUTH_FLOWS_COMPLETED,
+    METRIC_OAUTH_FLOWS_FAILED
+)
 from app.dao.firestore_dao import FirestoreDAO
 from app.dependencies.firestore import get_firestore_dao
 
@@ -133,7 +139,10 @@ async def github_install(
         if not settings.github_client_id:
             logger.error(
                 "GitHub client ID not configured",
-                extra={"extra_fields": {"correlation_id": correlation_id}}
+                extra={"extra_fields": {
+                    "event": "oauth_config_error",
+                    "correlation_id": correlation_id
+                }}
             )
             raise HTTPException(
                 status_code=500,
@@ -143,7 +152,10 @@ async def github_install(
         if not settings.github_oauth_redirect_uri:
             logger.error(
                 "GitHub OAuth redirect URI not configured",
-                extra={"extra_fields": {"correlation_id": correlation_id}}
+                extra={"extra_fields": {
+                    "event": "oauth_config_error",
+                    "correlation_id": correlation_id
+                }}
             )
             raise HTTPException(
                 status_code=500,
@@ -160,6 +172,7 @@ async def github_install(
             logger.warning(
                 "Invalid scope format provided",
                 extra={"extra_fields": {
+                    "event": "oauth_invalid_scopes",
                     "correlation_id": correlation_id,
                     "provided_scopes": scopes_param[:50]  # Truncate for security
                 }}
@@ -181,9 +194,13 @@ async def github_install(
         
         github_url = f"https://github.com/login/oauth/authorize?{urlencode(params)}"
         
+        # Increment OAuth flow started counter
+        increment_counter(METRIC_OAUTH_FLOWS_STARTED)
+        
         logger.info(
             "Redirecting to GitHub OAuth authorization",
             extra={"extra_fields": {
+                "event": "oauth_flow_started",
                 "correlation_id": correlation_id,
                 "state_prefix": state[:8] + "...",
                 "scopes": scopes_param,
@@ -344,9 +361,14 @@ async def oauth_callback(
     try:
         # Check for OAuth errors from GitHub
         if error:
+            # Increment failure counter
+            increment_counter(METRIC_OAUTH_FLOWS_FAILED, labels={"reason": "user_denied"})
+            
             logger.warning(
                 "GitHub OAuth authorization failed",
                 extra={"extra_fields": {
+                    "event": "oauth_flow_failed",
+                    "outcome": "failure",
                     "correlation_id": correlation_id,
                     "error": error,
                     "description": error_description or "No description provided"
@@ -435,9 +457,14 @@ async def oauth_callback(
                 redirect_uri=settings.github_oauth_redirect_uri
             )
         except GitHubOAuthError as e:
+            # Increment failure counter
+            increment_counter(METRIC_OAUTH_FLOWS_FAILED, labels={"reason": "token_exchange_failed"})
+            
             logger.error(
                 "OAuth token exchange failed",
                 extra={"extra_fields": {
+                    "event": "oauth_token_exchange_failed",
+                    "outcome": "failure",
                     "correlation_id": correlation_id,
                     "error": sanitize_exception_message(e)
                 }}
@@ -514,16 +541,22 @@ async def oauth_callback(
             logger.info(
                 "GitHub token persisted to Firestore successfully",
                 extra={"extra_fields": {
+                    "event": "oauth_token_persisted",
                     "correlation_id": correlation_id,
                     "collection": settings.github_tokens_collection,
                     "doc_id": settings.github_tokens_doc_id
                 }}
             )
         except PermissionError as e:
+            # Increment failure counter
+            increment_counter(METRIC_OAUTH_FLOWS_FAILED, labels={"reason": "storage_permission_denied"})
+            
             # Firestore permission denied - IAM configuration issue
             logger.error(
                 "Permission denied writing to Firestore",
                 extra={"extra_fields": {
+                    "event": "oauth_storage_permission_denied",
+                    "outcome": "failure",
                     "correlation_id": correlation_id,
                     "error": sanitize_exception_message(e)
                 }},
@@ -540,10 +573,15 @@ async def oauth_callback(
                 status_code=503
             )
         except ValueError as e:
+            # Increment failure counter
+            increment_counter(METRIC_OAUTH_FLOWS_FAILED, labels={"reason": "storage_config_error"})
+            
             # Invalid data or missing encryption key
             logger.error(
                 "Invalid data for token persistence",
                 extra={"extra_fields": {
+                    "event": "oauth_storage_config_error",
+                    "outcome": "failure",
                     "correlation_id": correlation_id,
                     "error": sanitize_exception_message(e)
                 }},
@@ -560,10 +598,15 @@ async def oauth_callback(
                 status_code=503
             )
         except Exception as e:
+            # Increment failure counter
+            increment_counter(METRIC_OAUTH_FLOWS_FAILED, labels={"reason": "storage_error"})
+            
             # Other Firestore errors (network, quota, etc.)
             logger.error(
                 "Failed to persist GitHub token to Firestore",
                 extra={"extra_fields": {
+                    "event": "oauth_storage_error",
+                    "outcome": "failure",
                     "correlation_id": correlation_id,
                     "error": sanitize_exception_message(e),
                     "error_type": type(e).__name__
@@ -582,9 +625,14 @@ async def oauth_callback(
             )
         
         # Log successful token exchange (token already masked in service layer)
+        # Increment success counter
+        increment_counter(METRIC_OAUTH_FLOWS_COMPLETED)
+        
         logger.info(
             "OAuth flow completed successfully",
             extra={"extra_fields": {
+                "event": "oauth_flow_completed",
+                "outcome": "success",
                 "correlation_id": correlation_id,
                 "token_type": token_type,
                 "scope": scope or "unknown",
