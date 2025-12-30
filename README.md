@@ -243,6 +243,61 @@ GET /healthz
 ```
 Returns: `{"status": "ok"}`
 
+### GitHub App Installation
+```
+GET /github/install
+```
+Redirects to GitHub's OAuth authorization page to install the GitHub App.
+
+**Query Parameters:**
+- `scopes` (optional): Comma-separated list of OAuth scopes. Default: `user:email,read:org`
+
+**Response:**
+- HTTP 302 redirect to GitHub authorization page
+- Sets `oauth_state` cookie for CSRF protection
+
+**Example:**
+```bash
+curl http://localhost:8000/github/install
+# Redirects to: https://github.com/login/oauth/authorize?client_id=...&state=...
+```
+
+### OAuth Callback
+```
+GET /oauth/callback
+```
+Handles the OAuth callback from GitHub after user authorization.
+
+**Query Parameters:**
+- `code`: Authorization code from GitHub (required)
+- `state`: CSRF state token (required)
+- `error`: Error code if authorization failed (optional)
+- `error_description`: Error description (optional)
+
+**Response:**
+- HTTP 200: HTML success page with token details (masked)
+- HTTP 400: HTML error page for invalid state or missing parameters
+- HTTP 500: HTML error page for token exchange failures
+
+**Security Features:**
+- Validates CSRF state token (one-time use)
+- Checks state cookie matches query parameter
+- State tokens expire after 5 minutes
+- Logs all OAuth attempts with correlation IDs
+- Masks tokens in logs (shows only first 8 and last 4 characters)
+
+**Example Success Flow:**
+1. User visits `/github/install`
+2. User authorizes on GitHub
+3. GitHub redirects to `/oauth/callback?code=...&state=...`
+4. Service validates state and exchanges code for access token
+5. User sees success page with token details
+
+**Notes:**
+- Access tokens are logged but NOT persisted to any database
+- Tokens are masked in logs for security
+- All OAuth flows include correlation IDs for tracking
+
 ### OpenAPI Documentation
 ```
 GET /docs
@@ -287,10 +342,12 @@ github-app-basic/
 │   ├── config.py            # Configuration management
 │   ├── routes/
 │   │   ├── __init__.py
-│   │   └── health.py        # Health check endpoint
+│   │   ├── health.py        # Health check endpoint
+│   │   └── oauth.py         # GitHub OAuth endpoints (/github/install, /oauth/callback)
 │   ├── services/
 │   │   ├── __init__.py
-│   │   └── firestore.py     # Firestore client initialization
+│   │   ├── firestore.py     # Firestore client initialization
+│   │   └── github.py        # GitHub App JWT & OAuth manager
 │   ├── dao/
 │   │   ├── __init__.py
 │   │   └── firestore_dao.py # Firestore data access layer
@@ -299,12 +356,13 @@ github-app-basic/
 │   │   └── firestore.py     # FastAPI dependency injection
 │   └── utils/
 │       ├── __init__.py
-│       └── logging.py       # Structured logging setup
+│       └── logging.py       # Structured logging with correlation IDs
 ├── tests/
 │   ├── __init__.py
 │   ├── test_config.py       # Configuration tests
 │   ├── test_health.py       # Health endpoint tests
-│   └── test_firestore_dao.py # Firestore DAO tests
+│   ├── test_firestore_dao.py # Firestore DAO tests
+│   └── test_oauth_flow.py   # OAuth & JWT tests (33 tests)
 ├── requirements.txt         # Production dependencies
 ├── requirements-dev.txt     # Development dependencies
 ├── pyproject.toml           # pytest configuration
@@ -320,10 +378,18 @@ The service uses structured JSON logging with the following fields:
 - `logger`: Logger name (module path)
 - `message`: Log message
 - `request_id`: Request ID from headers (when available)
+- `correlation_id`: Correlation ID for OAuth flows and multi-step operations (when available)
 
 Request IDs are extracted from:
 1. `x-cloud-trace-context` header (Cloud Run)
 2. `x-request-id` header (fallback)
+
+Correlation IDs are automatically generated for:
+- OAuth authorization flows
+- GitHub App JWT operations
+- Multi-step transactions
+
+This enables complete traceability of requests and OAuth flows across log entries.
 
 ## Cloud Run Deployment
 
@@ -815,9 +881,81 @@ make deploy PROJECT_ID=my-project REGION=us-east1
 
 ## Next Steps
 
-- Add GitHub API integration logic
-- Implement token minting endpoints
-- Add database persistence
+This service now includes:
+
+### ✅ Implemented Features
+- **GitHub App JWT Generation**: Create signed JWTs for GitHub App API authentication
+  - Uses RS256 algorithm with configured private key
+  - Automatic clock skew handling (60 seconds)
+  - Respects GitHub's 600-second maximum expiration
+  - Comprehensive error handling for malformed PEM keys
+  
+- **OAuth Installation Flow**: `/github/install` endpoint
+  - Redirects to GitHub with proper OAuth parameters
+  - CSRF protection via cryptographically strong state tokens
+  - Configurable OAuth scopes
+  - Secure cookie handling (HttpOnly, SameSite)
+  
+- **OAuth Callback Handler**: `/oauth/callback` endpoint
+  - State token validation (one-time use, 5-minute expiration)
+  - Authorization code exchange for access tokens
+  - Comprehensive error handling and user-friendly HTML responses
+  - Token logging with masking for security
+  - Correlation ID tracking for debugging
+  
+- **Security Features**:
+  - CSRF protection via state tokens
+  - State token expiration and cleanup
+  - Token masking in logs
+  - Correlation IDs for OAuth flow tracking
+  - No token persistence (development/demo mode)
+
+### 🔧 Usage Examples
+
+#### GitHub App JWT Generation
+```python
+from app.services.github import GitHubAppJWT
+from app.config import get_settings
+
+settings = get_settings()
+jwt_generator = GitHubAppJWT(
+    app_id=settings.github_app_id,
+    private_key_pem=settings.github_app_private_key_pem
+)
+
+# Generate JWT for GitHub API calls
+token = jwt_generator.generate_jwt(expiration_seconds=300)
+
+# Use token in API requests
+headers = {
+    "Authorization": f"Bearer {token}",
+    "Accept": "application/vnd.github+json"
+}
+```
+
+#### Testing OAuth Flow Locally
+```bash
+# Start the service
+export GITHUB_CLIENT_ID=Iv1.your_client_id
+export GITHUB_CLIENT_SECRET=your_client_secret
+export GITHUB_APP_ID=your_app_id
+export GITHUB_OAUTH_REDIRECT_URI=http://localhost:8000/oauth/callback
+uvicorn app.main:app --reload
+
+# Visit in browser
+open http://localhost:8000/github/install
+
+# Or with custom scopes
+open http://localhost:8000/github/install?scopes=repo,user
+```
+
+### 📝 Future Enhancements
+- Add GitHub API integration logic for repositories and installations
+- Implement token minting endpoints for installation access tokens
+- Add webhook handlers for GitHub App events
+- Consider Redis/Memcache for distributed state token storage
+- Add rate limiting for OAuth endpoints
+- Implement user session management
 - Set up CI/CD pipelines
 
 
