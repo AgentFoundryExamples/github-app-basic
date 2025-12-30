@@ -13,9 +13,12 @@
 # limitations under the License.
 """Configuration management for the GitHub App token minting service."""
 
+import logging
 from typing import Optional
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -28,7 +31,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=True,
+        case_sensitive=False,  # Allow GITHUB_APP_ID to match github_app_id field
         extra="ignore",
         env_ignore_empty=True
     )
@@ -47,10 +50,11 @@ class Settings(BaseSettings):
     
     # GitHub App Configuration
     github_app_id: Optional[str] = Field(default=None, description="GitHub App ID")
-    github_private_key: Optional[str] = Field(default=None, description="GitHub App private key")
+    github_app_private_key_pem: Optional[str] = Field(default=None, description="GitHub App private key in PEM format")
     github_client_id: Optional[str] = Field(default=None, description="GitHub App OAuth client ID")
     github_client_secret: Optional[str] = Field(default=None, description="GitHub App OAuth client secret")
-    github_webhook_secret: Optional[str] = Field(default=None, description="GitHub webhook secret")
+    github_webhook_secret: Optional[str] = Field(default=None, description="GitHub webhook secret (optional)")
+    github_oauth_redirect_uri: Optional[str] = Field(default=None, description="GitHub OAuth redirect URI")
     
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
@@ -66,21 +70,68 @@ class Settings(BaseSettings):
             raise ValueError("app_env must be 'dev' or 'prod'")
         return v
     
-    def validate_production_settings(self) -> None:
+    @field_validator("github_app_id", mode="before")
+    @classmethod
+    def validate_github_app_id(cls, v: Optional[str]) -> Optional[str]:
+        """Trim whitespace from GitHub App ID."""
+        if v is not None and isinstance(v, str):
+            v = v.strip()
+            # Return None only if completely empty after trimming
+            if not v:
+                return None
+        return v
+    
+    @field_validator("github_app_private_key_pem", mode="before")
+    @classmethod
+    def validate_github_app_private_key_pem(cls, v: Optional[str]) -> Optional[str]:
+        """Validate and normalize PEM private key format.
+        
+        Accepts PEM keys with either literal newlines or escaped \\n sequences.
+        Raises ValueError if the format appears invalid.
+        """
+        if v is None:
+            return None
+        
+        # Strip outer whitespace
+        v = v.strip()
+        if not v:
+            return None
+        
+        # Replace escaped newlines with actual newlines
+        v = v.replace('\\n', '\n')
+        
+        # Validate basic PEM structure
+        if not v.startswith('-----BEGIN'):
+            raise ValueError(
+                "GITHUB_APP_PRIVATE_KEY_PEM must start with a PEM header (e.g., '-----BEGIN RSA PRIVATE KEY-----'). "
+                "Ensure the key is properly formatted and includes the BEGIN/END markers."
+            )
+        
+        if not v.endswith('-----') or '-----END' not in v:
+            raise ValueError(
+                "GITHUB_APP_PRIVATE_KEY_PEM must end with a PEM footer (e.g., '-----END RSA PRIVATE KEY-----'). "
+                "Ensure the key is properly formatted and includes the BEGIN/END markers."
+            )
+        
+        return v
+    
+    @model_validator(mode='after')
+    def validate_production_settings(self) -> "Settings":
         """Validate that required settings are present for production.
         
         Raises:
             ValueError: If required production settings are missing.
         """
         if self.app_env != "prod":
-            return
+            return self
         
+        # Required fields for production (webhook_secret is optional)
         required_fields = {
             "github_app_id": self.github_app_id,
-            "github_private_key": self.github_private_key,
+            "github_app_private_key_pem": self.github_app_private_key_pem,
             "github_client_id": self.github_client_id,
             "github_client_secret": self.github_client_secret,
-            "github_webhook_secret": self.github_webhook_secret,
+            "github_oauth_redirect_uri": self.github_oauth_redirect_uri,
         }
         
         missing_fields = [
@@ -93,6 +144,14 @@ class Settings(BaseSettings):
                 f"Production environment requires the following settings: "
                 f"{', '.join(f.upper() for f in missing_fields)}"
             )
+        
+        # Log warning if webhook secret is not set
+        if not self.github_webhook_secret:
+            logger.warning(
+                "GITHUB_WEBHOOK_SECRET is not set. Webhook validation will not be available. "
+                "This is acceptable for development but should be configured for production webhook endpoints."
+            )
+        return self
 
 
 def get_settings() -> Settings:
@@ -104,6 +163,4 @@ def get_settings() -> Settings:
     Raises:
         ValueError: If production validation fails.
     """
-    settings = Settings()
-    settings.validate_production_settings()
-    return settings
+    return Settings()

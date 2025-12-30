@@ -159,9 +159,6 @@ class TestApplicationLifespan:
         """Test that app fails to initialize with invalid prod config."""
         from app.config import Settings
         
-        # Create settings directly with prod but no GitHub secrets
-        settings = Settings(_env_file=None, app_env="prod")
-        
-        # Validation should fail
+        # Should fail during Settings instantiation with prod but no GitHub secrets
         with pytest.raises(ValueError, match="Production environment requires"):
-            settings.validate_production_settings()
+            Settings(_env_file=None, app_env="prod")

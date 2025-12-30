@@ -352,9 +352,10 @@ class TestFirestoreDependencyInjection:
             gcp_project_id="test-project",
             # Add required prod fields to pass validation
             github_app_id="test",
-            github_private_key="test",
+            github_app_private_key_pem="-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----",
             github_client_id="test",
             github_client_secret="test",
+            github_oauth_redirect_uri="https://example.com/callback",
             github_webhook_secret="test"
         )
         

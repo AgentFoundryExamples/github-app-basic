@@ -45,6 +45,39 @@ pip install -r requirements-dev.txt
 
 The service is configured via environment variables. Create a `.env` file in the project root or export the variables:
 
+### GitHub App Setup
+
+Before configuring the service, you need to create and configure a GitHub App:
+
+1. **Create a GitHub App**:
+   - Go to [GitHub Settings → Developer settings → GitHub Apps](https://github.com/settings/apps)
+   - Click "New GitHub App"
+   - Fill in the required information:
+     - **GitHub App name**: Choose a unique name
+     - **Homepage URL**: Your application URL or repository URL
+     - **Webhook URL**: `https://your-service.run.app/webhooks/github` (or your local testing URL)
+     - **Webhook secret**: Generate a secure random token (e.g., `openssl rand -hex 32`)
+
+2. **Configure Permissions** (as needed for your use case):
+   - Set repository or organization permissions based on your requirements
+   - Subscribe to relevant webhook events
+
+3. **Generate OAuth Credentials**:
+   - In your GitHub App settings, note the **App ID** (numeric)
+   - Generate a **Client Secret** under "Client secrets"
+   - Note the **Client ID** (starts with `Iv1.` or `Iv23.`)
+
+4. **Generate a Private Key**:
+   - Scroll to "Private keys" section
+   - Click "Generate a private key"
+   - Download the `.pem` file - this is your `GITHUB_APP_PRIVATE_KEY_PEM`
+   - **IMPORTANT**: Store this file securely. GitHub will not show it again.
+
+5. **Configure OAuth Callback URL**:
+   - Set the callback URL to match your redirect URI:
+     - Local: `http://localhost:8000/auth/callback`
+     - Cloud Run: `https://your-service-name.run.app/auth/callback`
+
 ### Required for Production (APP_ENV=prod)
 
 ```bash
@@ -52,16 +85,35 @@ The service is configured via environment variables. Create a `.env` file in the
 APP_ENV=prod
 
 # GitHub App Configuration
-GITHUB_APP_ID=<your-app-id>
-GITHUB_PRIVATE_KEY=<your-private-key>
-GITHUB_CLIENT_ID=<your-client-id>
-GITHUB_CLIENT_SECRET=<your-client-secret>
-GITHUB_WEBHOOK_SECRET=<your-webhook-secret>
+GITHUB_APP_ID=<your-app-id>                    # Numeric App ID from GitHub App settings
+GITHUB_APP_PRIVATE_KEY_PEM=<your-private-key>  # Contents of downloaded .pem file
+GITHUB_CLIENT_ID=<your-client-id>              # OAuth Client ID (starts with Iv1.)
+GITHUB_CLIENT_SECRET=<your-client-secret>      # Generated OAuth client secret
+GITHUB_OAUTH_REDIRECT_URI=<your-redirect-uri>  # OAuth callback URL
+# GITHUB_WEBHOOK_SECRET is optional but recommended for webhook validation
 
 # GCP Configuration (required for Firestore)
 GCP_PROJECT_ID=<your-project-id>
 GOOGLE_APPLICATION_CREDENTIALS=<path-to-credentials-json>
 ```
+
+### PEM Key Format
+
+The `GITHUB_APP_PRIVATE_KEY_PEM` must be in PEM format with proper BEGIN/END markers. You have two options:
+
+**Option 1: Escaped newlines (recommended for environment variables)**
+```bash
+export GITHUB_APP_PRIVATE_KEY_PEM="-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----"
+```
+
+**Option 2: Literal newlines (for .env files)**
+```bash
+GITHUB_APP_PRIVATE_KEY_PEM="-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----"
+```
+
+The service automatically handles both formats and provides clear error messages for invalid PEM keys.
 
 ### Optional Configuration
 
@@ -75,6 +127,9 @@ REGION=us-central     # GCP region (default: us-central)
 
 # CORS
 ENABLE_CORS=false      # Enable CORS middleware (default: false)
+
+# GitHub Webhook Secret (optional, but recommended for production)
+GITHUB_WEBHOOK_SECRET=<your-webhook-secret>  # For webhook signature verification
 ```
 
 ### Development Defaults
@@ -440,10 +495,11 @@ This deploys with placeholder GitHub credentials. The service will start but Git
 ```bash
 # Set environment variables
 export GITHUB_APP_ID=123456
-export GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
+export GITHUB_APP_PRIVATE_KEY_PEM="-----BEGIN RSA PRIVATE KEY-----\n..."
 export GITHUB_CLIENT_ID=Iv1.abc123
 export GITHUB_CLIENT_SECRET=ghp_abc123
 export GITHUB_WEBHOOK_SECRET=your_webhook_secret
+export GITHUB_OAUTH_REDIRECT_URI=https://your-service.run.app/auth/callback
 
 # Deploy with secrets
 make deploy-with-secrets PROJECT_ID=your-gcp-project-id REGION=us-central1
@@ -457,9 +513,9 @@ gcloud run deploy github-app-token-service \
   --region us-central1 \
   --no-allow-unauthenticated \
   --set-env-vars APP_ENV=prod,GCP_PROJECT_ID=your-gcp-project-id,REGION=us-central1 \
-  --set-env-vars GITHUB_APP_ID=123456,GITHUB_PRIVATE_KEY="..." \
+  --set-env-vars GITHUB_APP_ID=123456,GITHUB_APP_PRIVATE_KEY_PEM="..." \
   --set-env-vars GITHUB_CLIENT_ID=...,GITHUB_CLIENT_SECRET=... \
-  --set-env-vars GITHUB_WEBHOOK_SECRET=... \
+  --set-env-vars GITHUB_WEBHOOK_SECRET=...,GITHUB_OAUTH_REDIRECT_URI=... \
   --project your-gcp-project-id
 ```
 
@@ -471,7 +527,7 @@ When GitHub credentials change, redeploy with updated values:
 # Update specific environment variables
 gcloud run services update github-app-token-service \
   --region us-central1 \
-  --update-env-vars GITHUB_APP_ID=new_value,GITHUB_PRIVATE_KEY="new_key" \
+  --update-env-vars GITHUB_APP_ID=new_value,GITHUB_APP_PRIVATE_KEY_PEM="new_key" \
   --project your-gcp-project-id
 ```
 
@@ -715,11 +771,16 @@ ERROR: The user-provided container failed to start and listen on the port define
    ```bash
    # Create secrets in Secret Manager
    echo -n "your-app-id" | gcloud secrets create github-app-id --data-file=-
+   cat your-private-key.pem | gcloud secrets create github-app-private-key-pem --data-file=-
    
    # Deploy with secrets mounted from Secret Manager
    gcloud run deploy github-app-token-service \
      --set-secrets="GITHUB_APP_ID=github-app-id:latest" \
-     --set-secrets="GITHUB_PRIVATE_KEY=github-private-key:latest" \
+     --set-secrets="GITHUB_APP_PRIVATE_KEY_PEM=github-app-private-key-pem:latest" \
+     --set-secrets="GITHUB_CLIENT_ID=github-client-id:latest" \
+     --set-secrets="GITHUB_CLIENT_SECRET=github-client-secret:latest" \
+     --set-secrets="GITHUB_WEBHOOK_SECRET=github-webhook-secret:latest" \
+     --set-env-vars="GITHUB_OAUTH_REDIRECT_URI=https://your-service.run.app/auth/callback" \
      # ... other flags
    ```
    This prevents secrets from appearing in deployment history and audit logs.
