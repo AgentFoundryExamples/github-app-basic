@@ -30,10 +30,11 @@ def check_health():
         print(f"Health check failed: {e}", file=sys.stderr)
         return 1
     finally:
-        try:
-            conn.close()
-        except:
-            pass
+        if 'conn' in locals():
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 if __name__ == '__main__':

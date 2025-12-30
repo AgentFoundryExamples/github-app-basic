@@ -727,8 +727,7 @@ ERROR: The user-provided container failed to start and listen on the port define
 5. **Monitor Access**: Review IAM policies and Cloud Audit Logs periodically
 6. **Avoid Command-Line Secrets**: Never pass secrets as command-line arguments where they may be logged
 7. **Secure Logging**: Ensure logs don't contain sensitive data. The application uses structured logging that excludes credentials.
-5. **Use Secret Manager**: For production, consider storing secrets in Secret Manager instead of environment variables
-6. **Enable VPC**: For additional security, deploy Cloud Run in a VPC Service Controls perimeter
+8. **Enable VPC**: For additional security, deploy Cloud Run in a VPC Service Controls perimeter
 
 ## Makefile Commands
 
