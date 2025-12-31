@@ -2850,9 +2850,14 @@ pytest -v
 
 # Start development server with Firestore emulator
 firebase emulators:start --only firestore  # In one terminal
+
+# In another terminal, set environment variables and run the service
 export FIRESTORE_EMULATOR_HOST=localhost:8080
 export GCP_PROJECT_ID=demo-project
-uvicorn app.main:app --reload  # In another terminal
+export GOOGLE_APPLICATION_CREDENTIALS=""  # Prevents ADC lookup
+export GITHUB_TOKEN_ENCRYPTION_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
+export APP_ENV=dev
+uvicorn app.main:app --reload
 ```
 
 ## Author
