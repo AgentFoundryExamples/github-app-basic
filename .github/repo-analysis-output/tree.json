@@ -298,6 +298,14 @@
     },
     {
       "type": "file",
+      "name": "CHANGELOG.md"
+    },
+    {
+      "type": "file",
+      "name": "CONTRIBUTING.md"
+    },
+    {
+      "type": "file",
       "name": "Dockerfile"
     },
     {

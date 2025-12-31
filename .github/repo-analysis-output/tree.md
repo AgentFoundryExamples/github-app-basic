@@ -67,6 +67,8 @@
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore
+├── CHANGELOG.md
+├── CONTRIBUTING.md
 ├── Dockerfile
 ├── healthcheck.py
 ├── LICENSE
