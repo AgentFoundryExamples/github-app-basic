@@ -2,18 +2,52 @@
 
 FastAPI-based service for minting GitHub App tokens with GCP integration, designed for Cloud Run deployment.
 
+## Overview
+
+This service provides secure OAuth token management for GitHub Apps in a self-hosted, single-user environment. It handles OAuth authorization flows, encrypts and stores tokens in Firestore, and provides authenticated API access to retrieve tokens for GitHub API calls.
+
+**Target Audience:** Individual developers or small teams self-hosting on Google Cloud Platform who need a secure way to manage GitHub App OAuth tokens.
+
+## Quick Links
+
+- **[Self-Hosting Guide](docs/SELF_HOSTING.md)** - Complete GCP setup and deployment
+- **[GitHub App Configuration](docs/GITHUB_APP.md)** - GitHub App creation and OAuth setup
+- **[Operations Guide](docs/OPERATIONS.md)** - Day-to-day operations and maintenance
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Security Documentation](docs/SECURITY.md)** - Threat model and security best practices
+- **[Local Development Guide](docs/LOCAL_DEV.md)** - Running and testing locally
+
 ## Features
 
-- 🚀 FastAPI framework with async support
-- ⚙️ Pydantic Settings-based configuration management
-- 📝 Structured JSON logging with request ID tracing
-- 🏥 Health check endpoint
-- 📚 Auto-generated OpenAPI documentation (Swagger UI)
-- 🔒 Production environment validation
-- 🌐 Optional CORS middleware (disabled by default)
-- 🔐 OAuth token persistence with AES-256-GCM encryption in Firestore
-- 🛡️ Secure token storage with automated timestamp normalization (UTC ISO-8601)
-- 🔄 Token refresh workflows with cooldown enforcement and retry logic
+### Core Capabilities (Stable)
+
+- 🔐 **OAuth Token Management**: Complete GitHub App OAuth flow with CSRF protection
+- 🔒 **Defense-in-Depth Encryption**: AES-256-GCM encryption for tokens at rest in Firestore
+- 🔑 **IAM-Based Access Control**: Cloud Run IAM authentication for all endpoints
+- 📝 **Structured Logging**: JSON logging with correlation IDs and automatic token redaction
+- 🏥 **Health Monitoring**: Health check endpoint with Firestore connectivity validation
+- 📚 **OpenAPI Documentation**: Auto-generated Swagger UI for API exploration
+- 🔄 **Token Refresh**: Automatic refresh with cooldown enforcement and retry logic
+
+### Experimental Features (Opt-In)
+
+- 📊 **Request Logging Middleware**: Detailed HTTP request/response logging (set `ENABLE_REQUEST_LOGGING=true`)
+- 📈 **Prometheus Metrics**: Token refresh and webhook event counters (set `ENABLE_METRICS=true`)
+
+### Configuration Toggles
+
+Configure behavior via environment variables:
+
+| Toggle | Default | Description |
+|--------|---------|-------------|
+| `ENABLE_REQUEST_LOGGING` | `false` | Enable detailed HTTP request logging |
+| `ENABLE_METRICS` | `false` | Enable Prometheus metrics endpoint at `/metrics` |
+| `ENABLE_CORS` | `false` | Enable CORS middleware for cross-origin requests |
+| `TOKEN_REFRESH_THRESHOLD_MINUTES` | `30` | Minutes before expiry to trigger refresh |
+| `TOKEN_REFRESH_COOLDOWN_SECONDS` | `300` | Cooldown between failed refresh attempts |
+| `HEALTH_CHECK_CACHE_TTL_SECONDS` | `30` | Cache TTL for health check results |
+
+**Note:** Request logging and metrics are disabled by default to reduce log volume and costs in production. Enable for development, debugging, or when detailed observability is required.
 
 ## Prerequisites
 
