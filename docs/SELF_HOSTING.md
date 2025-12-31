@@ -2,6 +2,11 @@
 
 This guide walks you through deploying the GitHub App Token Minting Service on Google Cloud Platform (GCP) from scratch.
 
+**⚠️ Important Notes:**
+- **Placeholder Values**: Throughout this guide, replace placeholder values like `your-gcp-project-id`, `us-central1`, and `github-app-token-service` with your actual values.
+- **Shell Variables**: For consistency, we use shell variables (e.g., `$PROJECT_ID`, `$REGION`) throughout. Set these at the beginning of your session.
+- **Security**: Never commit secrets to version control. Use Secret Manager for production deployments.
+
 ## Prerequisites
 
 - A Google Cloud Platform account with billing enabled
@@ -350,18 +355,21 @@ echo "Next: Complete OAuth flow by visiting ${SERVICE_URL}/github/install"
 
 ```bash
 # Test health endpoint (requires authentication)
+echo "Starting gcloud proxy in the background..."
 gcloud run services proxy github-app-token-service \
   --region $REGION \
   --project=$PROJECT_ID &
+PROXY_PID=$!
 
-# In another terminal
+# Wait for the proxy to be ready
 sleep 5
+echo "Testing health endpoint..."
 curl http://localhost:8080/healthz
 
 # Expected response: {"status":"ok","firestore":"connected"}
 
 # Stop proxy
-pkill -f "gcloud run services proxy"
+kill $PROXY_PID
 ```
 
 ### View Service Logs

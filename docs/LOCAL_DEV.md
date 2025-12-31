@@ -65,6 +65,12 @@ export LOG_LEVEL=INFO
 
 For testing OAuth flows and GitHub integration:
 
+**⚠️ SECURITY WARNING:**
+- **Never store sensitive credentials in environment variables for production** - they can be exposed through process listings, logs, and environment dumps
+- **Use Secret Manager for all production secrets** - environment variables shown here are for local development only
+- **Protect your shell history** - use `set +o history` before setting secrets, or use `.env` files instead
+- **Never commit secrets** to version control, including in configuration files or documentation
+
 ```bash
 # Application
 export APP_ENV=dev
@@ -72,6 +78,7 @@ export PORT=8000
 export LOG_LEVEL=DEBUG
 
 # GitHub App (see GitHub App Setup section below)
+# ⚠️ WARNING: Sensitive credentials - for development only
 export GITHUB_APP_ID=123456
 export GITHUB_APP_PRIVATE_KEY_PEM="-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEA...
@@ -104,6 +111,13 @@ cp .env.example .env
 nano .env  # or your preferred editor
 ```
 
+**⚠️ SECURITY WARNING:**
+- **Never commit `.env` files to version control** - they contain sensitive credentials
+- Add `.env` to `.gitignore` (already done in this project)
+- For production, use Secret Manager instead of environment variables
+- For local development with sensitive data, consider using Secret Manager even locally
+- Limit access to your development machine and `.env` files
+
 **Example `.env` for local development:**
 
 ```bash
@@ -112,6 +126,7 @@ PORT=8000
 LOG_LEVEL=DEBUG
 
 # GitHub App Configuration
+# ⚠️ WARNING: These are sensitive credentials - never commit to version control
 GITHUB_APP_ID=123456
 GITHUB_APP_PRIVATE_KEY_PEM="-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEA...
@@ -396,7 +411,7 @@ docker run -p 8000:8000 \
   -e APP_ENV=dev \
   -e PORT=8000 \
   -e GITHUB_TOKEN_ENCRYPTION_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))') \
-  -v ~/.config/gcloud:/root/.config/gcloud:ro \
+  -v ~/.config/gcloud/application_default_credentials.json:/root/.config/gcloud/application_default_credentials.json:ro \
   github-app-token-service:dev
 
 # Or using Makefile
@@ -406,8 +421,8 @@ make docker-run
 
 **Mounting Credentials:**
 ```bash
-# Mount Application Default Credentials
--v ~/.config/gcloud:/root/.config/gcloud:ro
+# Mount Application Default Credentials (specific file, not entire directory)
+-v ~/.config/gcloud/application_default_credentials.json:/root/.config/gcloud/application_default_credentials.json:ro
 
 # Mount service account key
 -v /path/to/key.json:/app/credentials.json:ro

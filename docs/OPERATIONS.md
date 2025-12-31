@@ -488,6 +488,35 @@ Regular key rotation improves security but requires service disruption.
 
 ### Rotation Procedure
 
+**⚠️ SECURITY EXPOSURE WINDOW:**
+During steps 1-4, the new encryption key is visible in:
+- Shell history (if not cleared)
+- Process listings (`ps aux`)
+- Terminal scrollback buffer
+- Shell logs (if enabled)
+
+**Mitigation:**
+```bash
+# Disable shell history before generating key
+set +o history
+
+# Generate and use key
+NEW_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+# ... use $NEW_KEY in commands below ...
+
+# Re-enable shell history
+set -o history
+
+# Clear terminal scrollback
+clear
+
+# Or use Secret Manager directly without local variable
+python3 -c 'import secrets; print(secrets.token_hex(32))' | \
+  gcloud secrets versions add github-token-encryption-key --data-file=-
+```
+
+**Rotation Steps:**
+
 ```bash
 # 1. Generate new encryption key
 NEW_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
@@ -599,14 +628,37 @@ curl http://localhost:8080/metrics
 
 ```bash
 # Create alert for token refresh failures
+# This assumes a log-based metric named 'github_token_refresh_failures' has been created.
+# See: https://cloud.google.com/logging/docs/logs-based-metrics/gcloud-cli
 gcloud alpha monitoring policies create \
-  --notification-channels=CHANNEL_ID \
-  --display-name="GitHub Token Refresh Failures" \
-  --condition-display-name="High refresh failure rate" \
-  --condition-threshold-value=5 \
-  --condition-threshold-duration=300s \
-  --aggregation-alignment-period=60s \
+  --policy-from-file="path/to/your/alert-policy.json" \
   --project=$PROJECT_ID
+
+# Example alert-policy.json:
+# {
+#   "displayName": "GitHub Token Refresh Failures",
+#   "combiner": "OR",
+#   "conditions": [
+#     {
+#       "displayName": "High refresh failure rate",
+#       "conditionThreshold": {
+#         "filter": "metric.type=\"logging.googleapis.com/user/github_token_refresh_failures\" resource.type=\"cloud_run_revision\"",
+#         "comparison": "COMPARISON_GT",
+#         "thresholdValue": 5,
+#         "duration": "300s",
+#         "aggregations": [
+#           {
+#             "alignmentPeriod": "60s",
+#             "perSeriesAligner": "ALIGN_RATE"
+#           }
+#         ]
+#       }
+#     }
+#   ],
+#   "notificationChannels": [
+#     "projects/your-gcp-project-id/notificationChannels/CHANNEL_ID"
+#   ]
+# }
 ```
 
 ### Request Logging

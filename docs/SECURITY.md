@@ -281,6 +281,14 @@ echo $KEY | grep -E '^[0-9a-f]{64}$'
 - Use Redis/Memcache for distributed state storage (future enhancement)
 - Deploy with single instance (`--max-instances 1`) if OAuth frequency is low
 
+**⚠️ PRODUCTION CONSTRAINT:**
+For production deployments with multiple instances, in-memory OAuth state storage is a **hard limitation**. Multi-instance deployments will experience OAuth flow failures when users are load-balanced across instances. To ensure reliable OAuth flows:
+1. **Deploy with `--max-instances 1`** to force single-instance operation, OR
+2. **Implement external state storage** (Redis/Memcache) - this is not currently available and requires code changes
+3. **Use sticky sessions** if your load balancer supports it (Cloud Run does not)
+
+This is an architectural constraint, not a configuration option. Plan accordingly for production use.
+
 ## Residual Risks
 
 ### High-Impact Residual Risks
@@ -547,10 +555,12 @@ gcloud logging read \
 1. **Immediate Actions (5 minutes):**
    ```bash
    # Revoke token in GitHub
-   # Navigate to: https://github.com/settings/tokens
-   # Or via API (if you have another token):
+   # Navigate to: https://github.com/settings/connections/applications/YOUR_CLIENT_ID
+   # Or via API (if you have another token with sufficient permissions):
    curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
-     "https://api.github.com/applications/$CLIENT_ID/token" \
+     -H "Accept: application/vnd.github+json" \
+     -H "X-GitHub-Api-Version: 2022-11-28" \
+     "https://api.github.com/applications/$CLIENT_ID/grant" \
      -d '{"access_token":"$COMPROMISED_TOKEN"}'
    
    # Delete token from Firestore
