@@ -41,6 +41,13 @@
   ├── __init__.py
   ├── config.py
   └── main.py
+├── docs
+  ├── GITHUB_APP.md
+  ├── LOCAL_DEV.md
+  ├── OPERATIONS.md
+  ├── SECURITY.md
+  ├── SELF_HOSTING.md
+  └── TROUBLESHOOTING.md
 ├── scripts
   ├── reset_github_token.py
   └── show_token_metadata.py

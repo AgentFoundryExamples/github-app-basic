@@ -188,6 +188,36 @@
     },
     {
       "type": "directory",
+      "name": "docs",
+      "children": [
+        {
+          "type": "file",
+          "name": "GITHUB_APP.md"
+        },
+        {
+          "type": "file",
+          "name": "LOCAL_DEV.md"
+        },
+        {
+          "type": "file",
+          "name": "OPERATIONS.md"
+        },
+        {
+          "type": "file",
+          "name": "SECURITY.md"
+        },
+        {
+          "type": "file",
+          "name": "SELF_HOSTING.md"
+        },
+        {
+          "type": "file",
+          "name": "TROUBLESHOOTING.md"
+        }
+      ]
+    },
+    {
+      "type": "directory",
       "name": "scripts",
       "children": [
         {
