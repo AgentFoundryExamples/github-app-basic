@@ -1,6 +1,11 @@
 # GitHub App Token Minting Service
 
+[![Version](https://img.shields.io/badge/version-v0.1.0-blue.svg)](https://github.com/AgentFoundryExamples/github-app-basic/releases/tag/v0.1.0)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+
 FastAPI-based service for minting GitHub App tokens with GCP integration, designed for Cloud Run deployment.
+
+**Current Release**: [v0.1.0](https://github.com/AgentFoundryExamples/github-app-basic/releases/tag/v0.1.0) - Initial open-source release (December 31, 2025)
 
 ## Overview
 
@@ -16,6 +21,8 @@ This service provides secure OAuth token management for GitHub Apps in a self-ho
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 - **[Security Documentation](docs/SECURITY.md)** - Threat model and security best practices
 - **[Local Development Guide](docs/LOCAL_DEV.md)** - Running and testing locally
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to this project
+- **[Changelog](CHANGELOG.md)** - Release history and upgrade notes
 
 ## Features
 
@@ -2701,6 +2708,74 @@ python scripts/show_token_metadata.py
 - User session management with authentication
 - Set up CI/CD pipelines
 
+## Versioning and Releases
+
+This project follows [Semantic Versioning](https://semver.org/):
+- **MAJOR** version for incompatible API changes
+- **MINOR** version for new functionality in a backward-compatible manner
+- **PATCH** version for backward-compatible bug fixes
+
+### Current Release: v0.1.0
+
+**Release Date**: December 31, 2025
+
+**Stability Guarantees**:
+- ✅ **Stable**: Core OAuth flows, token storage/retrieval, health endpoints, IAM authentication
+- ⚠️ **Experimental**: Request logging middleware (`ENABLE_REQUEST_LOGGING`), Prometheus metrics (`ENABLE_METRICS`)
+- 🔧 **Configuration**: All environment variables in v0.1.0 are stable and will be supported in future releases
+
+**What's Stable**:
+- OAuth authorization flow (`/github/install`, `/oauth/callback`)
+- Token retrieval API (`POST /api/token`)
+- Health and readiness endpoints (`/healthz`, `/readyz`)
+- Firestore token storage with encryption
+- Cloud Run IAM authentication
+- Environment variable configuration (all documented variables)
+- Docker containerization and deployment procedures
+
+**What's Experimental** (may change in future releases):
+- Prometheus metrics endpoint format and available metrics
+- Request logging middleware log format
+- Token refresh cooldown implementation details
+- Admin API endpoints (`/admin/token-metadata`)
+
+**Migration and Upgrade Path**: See [CHANGELOG.md](CHANGELOG.md) for:
+- Detailed release notes for each version
+- Breaking changes and migration guides
+- Deprecation notices
+- New features and enhancements
+
+### Upgrading
+
+When upgrading between versions:
+
+1. **Review the [CHANGELOG.md](CHANGELOG.md)** for breaking changes and new features
+2. **Test in a non-production environment** before upgrading production
+3. **Backup Firestore data** before major version upgrades
+4. **Update environment variables** if new configuration options are required
+5. **Re-run OAuth flow** if token schema changes (rare, will be documented)
+
+For detailed upgrade instructions specific to each release, refer to the upgrade notes in the CHANGELOG.
+
+### Release Process
+
+This project follows a lightweight release process:
+
+1. **Version Tagging**: All releases are tagged in Git (e.g., `v0.1.0`, `v0.2.0`)
+2. **GitHub Releases**: Each tag has corresponding release notes on GitHub
+3. **Changelog Updates**: All changes are documented in [CHANGELOG.md](CHANGELOG.md)
+4. **Docker Images**: Release images are tagged and available in GCR
+
+**To deploy a specific version**:
+```bash
+# Use a specific release tag
+export IMAGE_TAG=v0.1.0
+make build-cloud PROJECT_ID=your-project
+make deploy PROJECT_ID=your-project
+```
+
+**Security Updates**: Critical security patches may be backported to previous minor versions. Subscribe to repository releases for notifications.
+
 
 
 # Permanents (License, Contributing, Author)
@@ -2709,11 +2784,76 @@ Do not change any of the below sections
 
 ## License
 
-This Agent Foundry Project is licensed under the Apache 2.0 License - see the LICENSE file for details.
+This Agent Foundry Project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
+
+### Using This Project
+
+When using or distributing this software:
+- ✅ You may use this code commercially
+- ✅ You may modify and distribute the code
+- ✅ You may sublicense the code
+- ⚠️ You must include the original copyright notice and license
+- ⚠️ You must state any significant changes made to the code
+- ⚠️ You must retain all copyright, patent, trademark, and attribution notices
+
+### Attribution for Derivative Works
+
+If you create derivative works based on this project:
+
+1. **Retain the Apache 2.0 License**: Your derivative work must also be licensed under Apache 2.0
+2. **Include a NOTICE File**: Create a `NOTICE` file with attribution:
+   ```
+   This software is based on the GitHub App Token Minting Service
+   Copyright [Original Authors]
+   Licensed under the Apache License, Version 2.0
+   
+   Modifications by [Your Name/Organization]
+   ```
+3. **Document Changes**: Clearly indicate what modifications you've made
+4. **Preserve Notices**: Keep all existing copyright, patent, and attribution notices
+
+### License Header Management
+
+**⚠️ IMPORTANT**: License headers in source files are automatically managed by a CI tool. 
+- ❌ Do NOT manually add or edit license headers in code files
+- ❌ Do NOT remove existing license headers
+- ✅ The CI tool will automatically add/update headers as needed
+
+Manually editing license headers may cause duplications or conflicts during CI runs.
 
 ## Contributing
 
-Feel free to submit issues and enhancement requests!
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- Setting up your development environment
+- Coding standards and best practices
+- Testing requirements and guidelines
+- Security considerations for contributors
+- Pull request process
+- How external contributors can test without GCP credentials (using Firestore emulator)
+
+For bug reports, feature requests, or questions, please open an issue on GitHub.
+
+**Quick Start for Contributors**:
+```bash
+# Fork and clone the repository
+git clone https://github.com/YOUR-USERNAME/github-app-basic.git
+cd github-app-basic
+
+# Set up development environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+
+# Run tests
+pytest -v
+
+# Start development server with Firestore emulator
+firebase emulators:start --only firestore  # In one terminal
+export FIRESTORE_EMULATOR_HOST=localhost:8080
+export GCP_PROJECT_ID=demo-project
+uvicorn app.main:app --reload  # In another terminal
+```
 
 ## Author
 
